@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ime</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.cdnfonts.com/css/kindegarten" rel="stylesheet">
+</head>
+<body>
+    <div class ="main">
+        <h1>Deni & Erty</h1>
+        <h3 class ="hints"> Pravihte li neshto dnes? </h3>
+
+        <!-- Add event button (opens modal) -->
+        <div class="controls">
+            <button id="showAddForm" type="button">Razbira se</button>
+        </div>
+
+        <!-- Modal add-event form -->
+        <div id="addEventModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+          <div class="modal-dialog" role="document">
+            <button id="closeModal" class="modal-close" aria-label="Close form">✕</button>
+            <form id="addEventForm" class="add-event-form" aria-label="Add timeline event">
+                <input name="title" type="text" placeholder="Event title" required />
+                <input name="date" type="date" required />
+                <select name="eventType" required>
+                    <option value="">Kude?</option>
+                    <option value="date">Date</option>
+                    <option value="skip">Peika do Lidl</option>
+                    <option value="home">U Deni</option>
+                    <option value="home">U Erty</option>
+                    <option value="skip">Other</option>
+
+                </select>
+                <textarea name="descriptionDeni" placeholder="Deni description" class="deni-comment"></textarea>
+                <textarea name="descriptionErty" placeholder="Erty description" class="erty-comment"></textarea>
+
+                <div class="form-actions">
+                    <button type="submit">Add</button>
+                    <button type="button" id="cancelAdd">Cancel</button>
+                </div>
+            </form>
+          </div>
+        </div>
+
+        <div class = "timeline-wrapper">
+            <ul class = "timeline">
+                <li data-date="Sun, Oct 26" data-iso="2025-10-26" data-event-type="other">
+                    <span class="title"> 3 hour yap session</span>
+                    <div class="data"> 
+                        <h3> Discord 3h</h3>
+                        <small>Sun, Oct 26</small>
+                        <p> В какво се въвлякох? Тази май е леко луда </p>
+                        <span class="close">Click to close</span>
+                    </div>
+                </li>
+                <li data-date="Wed, Nov 12" data-iso="2025-11-12" data-event-type="date">
+                    <span class="title"> First date</span>
+                    <div class="data" data-number="1"> 
+                        <h3> Cocteils</h3>
+                        <small>Wed, Nov 12</small>
+                        <p> Бяха много хубави коктейли, аз си бях много доволна </p>
+                        <span class="close">Click to close</span>
+                    </div>
+                </li>
+                <li data-date="Mon, Nov 24" data-iso="2025-11-24" data-event-type="date">
+                    <span class="title">НДК Коледен базар</span>
+                    <div class="data" data-number="2"> 
+                        <h3>Zaharen Pamuk</h3>
+                        <small>Mon, Nov 24</small>
+                        <p> Радвай се, че бабата със захарния памук те изкери</p>
+                        <span class="close">Click to close</span>
+                    </div>
+                </li>
+
+                <li data-date="Fri, Nov 28" data-iso="2025-11-28" data-event-type="date">
+                    <span class="title">U Nas</span>
+                    <div class="data" data-number="3"> 
+                        <h3>U Nas</h3>
+                        <small>Fri, Nov 28</small>
+                        <p>Спокойна вечер у нас — филм, хапване и време за почивка.</p>
+                        <span class="close">Click to close</span>
+                    </div>
+                </li>
+
+                <li data-date="Sun, Nov 30" data-iso="2025-11-30" data-event-type="date">
+                    <span class="title">Луксозна сладкарница</span>
+                    <div class="data" data-number="4"> 
+                        <h3>Луксозна сладкарница</h3>
+                        <small>Sun, Nov 30</small>
+                        <p>абсолютно не ни изгониха от тая сладкарница и абсолютно много добре се беше наспал направо уникално</p>
+                        <span class="close">Click to close</span>
+                    </div>
+                </li>
+
+                <li data-date="Mon, Dec 1" data-iso="2025-12-01" data-event-type="date">
+                    <span class="title">NDK & Me Izlrati</span>
+                    <div class="data" data-number="5"> 
+                        <h3>NDK & Me Izlrati</h3>
+                        <small>Mon, Dec 1</small>
+                        <p>Разходка до НДК, светлини и ме излъга — настроение за края на седмицата.</p>
+                        <span class="close">Click to close</span>
+                    </div>
+                </li>   
+            </ul>
+         </div>
+         <h3 class ="hints">  Statistics </h3>
+         <div class="stat-item">
+            <h5>Podpisahme dogovor predi:</h5>
+            <p id="contractCounter" class="counter">Loading...</p>
+         </div>
+         <div class="stat-item">
+            <h5>Turpish me ot:</h5>
+            <p id="turpishCounter" class="counter">Loading...</p>
+        </div>
+         <div class="stat-item">
+            <h5>Streak:</h5>
+            <p id="streakCounter" class="counter">Loading...</p>
+        </div>
+    
+        <div id="calenderContainer">
+            <div id = "calendarDiv">
+                <div id="calendarHeading">
+                    <p id="habitTitle">Month</p>
+                    <p id="totalDays">0/31</p>
+                </div>
+                <div id="calendarContent">
+                    <div id="tracker">
+                        <div class="days">
+                            <div class="day">1</div>
+                            <div class="day">2</div>
+                            <div class="day">3</div>
+                            <div class="day">4</div>
+                            <div class="day">5</div>
+                            <div class="day">6</div>
+                            <div class="day">7</div>
+                        </div>
+                        <div class="days">
+                            <div class="day">8</div>
+                            <div class="day">9</div>
+                            <div class="day">10</div>
+                            <div class="day">11</div>
+                            <div class="day">12</div>
+                            <div class="day">13</div>
+                            <div class="day">14</div>
+                        </div>
+                        <div class="days">
+                            <div class="day">15</div>
+                            <div class="day">16</div>
+                            <div class="day">17</div>
+                            <div class="day">18</div>
+                            <div class="day">19</div>
+                            <div class="day">20</div>
+                            <div class="day">21</div>
+                        </div>
+                        <div class="days">
+                            <div class="day">22</div>
+                            <div class="day">23</div>
+                            <div class="day">24</div>
+                            <div class="day">25</div>
+                            <div class="day">26</div>
+                            <div class="day">27</div>
+                            <div class="day">28</div>
+                        </div>
+                        <div class="days">
+                            <div class="day">29</div>
+                            <div class="day">30</div>
+                            <div class="day">31</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <h3 class = "hints">Quotes</h3>
+        <div class="controls">
+            <button id="showAddQuote" type="button">Add Quote</button>
+        </div>
+
+        <!-- Modal add-quote form -->
+        <div id="addQuoteModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+          <div class="modal-dialog" role="document">
+            <button id="closeQuoteModal" class="modal-close" aria-label="Close form">✕</button>
+            <form id="addQuoteForm" class="add-event-form" aria-label="Add quote">
+                <textarea name="quote" placeholder="Quote text" required></textarea>
+                <select name="person" id="personSelect" required>
+                    <option value="">Koj?</option>
+                    <option value="deni">Deni</option>
+                    <option value="erty">Erty</option>
+                    <option value="other">Other</option>
+                </select>
+                <input name="personName" id="personNameInput" type="text" placeholder="Name (if Other)" style="display: none;" />
+                <div class="form-actions">
+                    <button type="submit">Add Quote</button>
+                    <button type="button" id="cancelAddQuote">Cancel</button>
+                </div>
+            </form>
+          </div>
+        </div>
+        <ul id="quotesList" class="quotes-list"></ul>
+        <h3 class = "hints">Kakwo da kaja na Deni?</h3>
+        <div class="controls">
+            <button id="showAddQuote" type="button">Umna misul</button>
+        </div>
+    </div>
+
+    <script src="timeline.js"></script> 
+</body>
+</html>
