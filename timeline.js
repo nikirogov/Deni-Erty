@@ -1,7 +1,3 @@
-/* FULL timeline.js – structure preserved, adapted for Firebase (Firestore)
-   Works on localhost AND on Vercel
-*/
-
 /******************** FIREBASE INIT ********************/
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
@@ -9,6 +5,8 @@ import {
   collection,
   addDoc,
   getDocs,
+  deleteDoc,
+  doc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -45,27 +43,27 @@ const timelineWrapper = document.querySelector('.timeline-wrapper');
 const timeline = document.querySelector('.timeline');
 
 function wireDataHandlers(el) {
-  // el is the .data element
+  const li = el.closest('li');
+
   el.addEventListener('click', () => el.classList.toggle('show'));
 
   const closeBtn = el.querySelector('.close');
-  if (closeBtn) {
-    closeBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      el.classList.remove('show');
-    });
-  }
+  if (closeBtn) closeBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    el.classList.remove('show');
+  });
 
-  // Also toggle info when clicking the dot/title
-  const li = el.closest('li');
-  if (li) {
-    const titleEl = li.querySelector('.title');
-    if (titleEl) {
-      titleEl.addEventListener('click', (e) => {
-        e.stopPropagation();
-        el.classList.toggle('show');
-      });
-    }
+  const deleteBtn = el.querySelector('.delete-btn');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async e => {
+      e.stopPropagation();
+      if (confirm('Delete this event?')) {
+        const docId = li.dataset.docId;
+        if (docId) await deleteDoc(doc(db, 'events', docId));
+        li.remove();
+        renumberDates();
+      }
+    });
   }
 }
 
@@ -86,29 +84,32 @@ function renumberDates() {
   });
 }
 
-function addTimelineItem(event, save = false) {
-  const { title, date, descriptionDeni, descriptionErty, eventType } = event;
+async function addTimelineItem(event, docId = null) {
+  const { title, date, descriptionDeni, descriptionErty, eventType, specialEvent, image } = event;
 
   const li = document.createElement('li');
   li.dataset.iso = date;
   li.dataset.eventType = eventType;
   li.setAttribute('data-date', formatDate(date));
+  if (docId) li.dataset.docId = docId;
+  if (specialEvent) li.classList.add('special-event');
 
   li.innerHTML = `
     <span class="title">${escapeHtml(title)}</span>
     <div class="data ${eventType === 'skip' ? 'skip-class' : ''}">
+      ${image ? `<img src="${image}" alt="Event image" class="event-image">` : ''}
       <h3>${escapeHtml(title)}</h3>
       <small>${formatDate(date)}</small>
       <p class="deni-comment">${escapeHtml(descriptionDeni || '')}</p>
       <p class="erty-comment">${escapeHtml(descriptionErty || '')}</p>
       <span class="close">Click to close</span>
+      <button class="delete-btn">Delete</button>
     </div>
   `;
 
   const ts = new Date(date + 'T00:00:00').getTime();
   const children = [...timeline.children];
   let inserted = false;
-
   for (const child of children) {
     if (ts < getLiTimestamp(child)) {
       timeline.insertBefore(li, child);
@@ -127,15 +128,16 @@ const eventsCol = collection(db, 'events');
 
 async function loadEventsFromFirebase() {
   const snap = await getDocs(eventsCol);
-  snap.forEach(docSnap => addTimelineItem(docSnap.data()));
+  snap.forEach(docSnap => addTimelineItem(docSnap.data(), docSnap.id));
   renumberDates();
 }
 
 async function saveEventToFirebase(event) {
-  await addDoc(eventsCol, {
+  const docRef = await addDoc(eventsCol, {
     ...event,
     createdAt: serverTimestamp()
   });
+  return docRef.id;
 }
 
 /******************** MODAL + FORM ********************/
@@ -149,7 +151,6 @@ function openModal() {
   modal.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
 }
-
 function closeModal() {
   modal.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
@@ -160,16 +161,29 @@ showFormBtn.addEventListener('click', openModal);
 cancelBtn.addEventListener('click', closeModal);
 closeModalBtn.addEventListener('click', closeModal);
 
-addForm.addEventListener('submit', async (e) => {
+addForm.addEventListener('submit', async e => {
   e.preventDefault();
   const fd = new FormData(addForm);
+
+  // Handle optional image upload
+  const file = fd.get('eventImage');
+  let imgData = null;
+  if (file && file.size > 0) {
+    imgData = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.readAsDataURL(file);
+    });
+  }
 
   const event = {
     title: fd.get('title').trim(),
     date: fd.get('date'),
     descriptionDeni: fd.get('descriptionDeni'),
     descriptionErty: fd.get('descriptionErty'),
-    eventType: fd.get('eventType')
+    eventType: fd.get('eventType'),
+    specialEvent: fd.get('specialEvent') === 'on',
+    image: imgData // <-- optional image
   };
 
   if (!event.title || !event.date || !event.eventType) {
@@ -177,8 +191,8 @@ addForm.addEventListener('submit', async (e) => {
     return;
   }
 
-  addTimelineItem(event);
-  await saveEventToFirebase(event);
+  const docId = await saveEventToFirebase(event);
+  addTimelineItem(event, docId);
   closeModal();
 });
 
@@ -186,7 +200,6 @@ addForm.addEventListener('submit', async (e) => {
 (function () {
   const contractDate = new Date('2025-12-03T11:30:00');
   const turpishDate = new Date('2025-10-26T16:44:00');
-
   const contractEl = document.getElementById('contractCounter');
   const turpishEl = document.getElementById('turpishCounter');
 
@@ -209,6 +222,4 @@ addForm.addEventListener('submit', async (e) => {
 
 /******************** INIT ********************/
 loadEventsFromFirebase();
-
-// Wire existing static timeline items
 document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
