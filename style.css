@@ -262,16 +262,25 @@ h1{
     z-index: 9999;
 }
 .modal[aria-hidden="false"] { display: flex; }
-.modal-dialog {
-    background: #fff;
-    color: #222;
-    border-radius: 12px;
-    padding: 1rem;
-    width: min(720px, 95%);
-    max-height: 90vh;
-    overflow: auto;
+..modal-dialog {
     position: relative;
+    width: 400px;
+    height: 400px;
+    background-color: pink;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px; /* optional for slightly rounded corners */
+    overflow: hidden;
+    transform: none; /* remove previous rotation */
 }
+
+.modal-dialog::before,
+.modal-dialog::after {
+    content: none; /* remove the pseudo-elements that made the heart lobes */
+}
+
 .modal-close {
     position: absolute;
     top: .6rem;
@@ -283,24 +292,72 @@ h1{
 }
 
 .controls {
-    display: flex;
-    justify-content: flex-end;
-    margin: 0 0 0.8rem;
+    position: relative;
+    height: 120px; /* big enough for the heart button */
 }
 
+
 #showAddForm {
-    background: var(--secondary-color);
-    color: white;
-    padding: 0.45rem 0.9rem;
-    font-family: 'Adine', var(--font-family);
-    font-size: 2.8rem;
-    border-radius: 0.45rem;
+    position: relative;
+    width: 80px;
+    height: 80px;
+    background-color: red;
     border: none;
-    width: auto;
     cursor: pointer;
-    font-weight: 600;
-    align-self: center;
+    transform: rotate(-45deg);
+    display: inline-block;
+    margin: 0 auto;
 }
+
+/* Create the rounded "lobes" */
+#showAddForm::before,
+#showAddForm::after {
+    content: "";
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    background-color: red;
+    border-radius: 50%;
+}
+
+#showAddForm::before {
+    top: -40px;
+    left: 0;
+}
+
+#showAddForm::after {
+    left: 40px;
+    top: 0;
+}
+
+/* Optional hover effect */
+#showAddForm:hover {
+    transform: rotate(-45deg) scale(1.15); /* enlarges the heart */
+    background-color: #ff4d4d;}
+#showAddForm:hover::before,
+#showAddForm:hover::after {
+    background-color: #ff4d4d;
+}
+#showAddForm span {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(45deg);
+    font-family: 'Poppins', Arial, sans-serif;
+    font-size: 1.5rem;  /* adjust as needed */
+    font-weight: 600;
+    color: white;
+    text-align: center;   /* center multi-line text */
+    pointer-events: none;
+    z-index: 20;
+    line-height: 1.2;     /* compact lines to fit nicely */
+    white-space: pre-line; /* respect line breaks */
+    width: 70px;           /* constrain width to heart shape */
+}
+
+
+
+
 .controls { position: relative; height: 3rem; } /* give parent a height */
 .controls button {
   position: absolute;
@@ -312,6 +369,7 @@ h1{
 /* Add event form - compact, responsive */
 .add-event-form {
     display: flex;
+    flex-direction: column;
     gap: 0.6rem;
     align-items: center;
     margin-bottom: 1rem;
@@ -544,4 +602,49 @@ h1{
 
 .stat-item{
     font-family: "Kindegarten", sans-serif ;
+}
+.delete-btn {
+        display: inline-block;
+        margin-top: 5px;
+        padding: 2px 6px;
+        background-color: #e74c3c;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        font-size: 0.8rem;
+        cursor: pointer;
+      }
+      .delete-btn:hover {
+        background-color: #c0392b;
+      }
+.timeline li.special-event .data {
+    background-color: #FF0000; /* bright red */
+}
+.timeline li.special-event .data.show h3 {
+    color: #FF0000; /* bright red */
+}
+.data .event-image {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 40px;
+    height: 40px;
+    border-radius: 5px;
+    object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    z-index: 150; /* above other content */
+}
+
+.data .event-image:hover {
+    transform: scale(1.5);
+}
+.image-upload {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.image-upload input[type="file"] {
+  margin-top: 5px;
 }
