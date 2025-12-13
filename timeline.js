@@ -1,14 +1,17 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-import { getFirestore, collection, addDoc, onSnapshot } from "firebase/firestore";
+/* FULL timeline.js – structure preserved, adapted for Firebase (Firestore)
+   Works on localhost AND on Vercel
+*/
 
+/******************** FIREBASE INIT ********************/
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyC2IslvkWwdui2qwiXdp5U1eRaNAQlKSuY",
   authDomain: "deni-erty.firebaseapp.com",
@@ -19,155 +22,193 @@ const firebaseConfig = {
   measurementId: "G-TJVS4LYBF2"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
 const db = getFirestore(app);
 
+/******************** HELPERS ********************/
+function escapeHtml(str = '') {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
 
-// ------------------ TIMELINE LOGIC ------------------
-(function() {
-    const timeline = document.querySelector('.timeline');
-    const addForm = document.getElementById('addEventForm');
-    const modal = document.getElementById('addEventModal');
-    const showFormBtn = document.getElementById('showAddForm');
-    const cancelBtn = document.getElementById('cancelAdd');
-    const closeModalBtn = document.getElementById('closeModal');
-    let lastFocusedElement = null;
+function formatDate(dateValue) {
+  const d = new Date(dateValue + 'T00:00:00');
+  if (isNaN(d)) return dateValue;
+  const dayOfWeek = d.toLocaleDateString(undefined, { weekday: 'short' });
+  const monthDay = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${dayOfWeek}, ${monthDay}`;
+}
 
-    // --- Helpers ---
-    function escapeHtml(str = '') {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
+/******************** TIMELINE CORE ********************/
+const timelineWrapper = document.querySelector('.timeline-wrapper');
+const timeline = document.querySelector('.timeline');
 
-    function formatDate(dateValue) {
-        const d = new Date(dateValue + 'T00:00:00');
-        if (isNaN(d)) return dateValue;
-        const dayOfWeek = d.toLocaleDateString(undefined, { weekday: 'short' });
-        const monthDay = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        return `${dayOfWeek}, ${monthDay}`;
-    }
+function wireDataHandlers(el) {
+  // el is the .data element
+  el.addEventListener('click', () => el.classList.toggle('show'));
 
-    function getLiTimestamp(li) {
-        if (!li.dataset.iso) return Infinity;
-        const t = new Date(li.dataset.iso + 'T00:00:00').getTime();
-        return isNaN(t) ? Infinity : t;
-    }
-
-    function renumberDates() {
-        const allDateItems = Array.from(document.querySelectorAll('.timeline li[data-event-type="date"]'));
-        allDateItems.sort((a,b) => new Date(a.dataset.iso) - new Date(b.dataset.iso));
-        allDateItems.forEach((li, index) => {
-            const dataEl = li.querySelector('.data');
-            if (dataEl) dataEl.dataset.number = index + 1;
-        });
-    }
-
-    // --- Timeline item handlers ---
-    function wireDataHandlers(el) {
-        el.addEventListener('click', () => el.classList.toggle('show'));
-        const closeBtn = el.querySelector('.close');
-        if (closeBtn) closeBtn.addEventListener('click', e => {
-            e.stopPropagation();
-            el.classList.remove('show');
-        });
-    }
-
-    // --- Add timeline item to DOM ---
-    function addTimelineItem({ title, date, descriptionDeni='', descriptionErty='', eventType='other', docId=null }) {
-        const li = document.createElement('li');
-        li.dataset.date = formatDate(date);
-        li.dataset.iso = date;
-        li.dataset.eventType = eventType;
-        if (docId) li.dataset.docId = docId;
-
-        const dataClass = eventType === 'skip' ? 'data skip-class' : 'data';
-
-        li.innerHTML = `
-            <span class="title">${escapeHtml(title)}</span>
-            <div class="${dataClass}">
-                <h3>${escapeHtml(title)}</h3>
-                <small>${escapeHtml(formatDate(date))}</small>
-                <p class="deni-comment">${escapeHtml(descriptionDeni)}</p>
-                <p class="erty-comment">${escapeHtml(descriptionErty)}</p>
-                <span class="close">Click to close</span>
-            </div>
-        `;
-
-        // Insert in date order
-        const children = Array.from(timeline.querySelectorAll('li'));
-        let inserted = false;
-        const newTs = new Date(date + 'T00:00:00').getTime();
-        for (const child of children) {
-            if (newTs < getLiTimestamp(child)) {
-                timeline.insertBefore(li, child);
-                inserted = true;
-                break;
-            }
-        }
-        if (!inserted) timeline.appendChild(li);
-
-        wireDataHandlers(li.querySelector('.data'));
-        renumberDates();
-        li.scrollIntoView({ behavior: 'smooth', inline: 'center' });
-    }
-
-    // --- Modal open/close ---
-    function openModal() {
-        lastFocusedElement = document.activeElement;
-        modal.setAttribute('aria-hidden', 'false');
-        document.body.style.overflow = 'hidden';
-        const first = addForm.querySelector('[name="title"]');
-        if (first) first.focus();
-    }
-
-    function closeModal() {
-        modal.setAttribute('aria-hidden', 'true');
-        document.body.style.overflow = '';
-        addForm.reset();
-        if (lastFocusedElement) lastFocusedElement.focus();
-    }
-
-    showFormBtn.addEventListener('click', openModal);
-    cancelBtn.addEventListener('click', closeModal);
-    closeModalBtn.addEventListener('click', closeModal);
-    modal.addEventListener('click', e => { if(e.target === modal) closeModal(); });
-    document.addEventListener('keydown', e => { if(e.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') closeModal(); });
-
-    // --- Form submit: add new event ---
-    addForm.addEventListener('submit', async e => {
-        e.preventDefault();
-        const formData = new FormData(addForm);
-        const title = (formData.get('title') || '').trim();
-        const date = (formData.get('date') || '').trim();
-        const descriptionDeni = (formData.get('descriptionDeni') || '').trim();
-        const descriptionErty = (formData.get('descriptionErty') || '').trim();
-        const eventType = (formData.get('eventType') || '').trim();
-
-        if (!title || !date || !eventType) {
-            alert('Please provide a title, date, and event type.');
-            return;
-        }
-
-        try {
-            // Save to Firestore
-            const docRef = await addDoc(collection(db, "timelineEvents"), { title, date, descriptionDeni, descriptionErty, eventType });
-            addTimelineItem({ title, date, descriptionDeni, descriptionErty, eventType, docId: docRef.id });
-            closeModal();
-        } catch (err) {
-            console.error("Error adding event:", err);
-        }
+  const closeBtn = el.querySelector('.close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      el.classList.remove('show');
     });
+  }
 
-    // --- Realtime updates from Firestore ---
-    onSnapshot(collection(db, "timelineEvents"), snapshot => {
-        timeline.innerHTML = '';
-        snapshot.forEach(docSnap => {
-            addTimelineItem({ ...docSnap.data(), docId: docSnap.id });
-        });
-        renumberDates();
-    });
+  // Also toggle info when clicking the dot/title
+  const li = el.closest('li');
+  if (li) {
+    const titleEl = li.querySelector('.title');
+    if (titleEl) {
+      titleEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        el.classList.toggle('show');
+      });
+    }
+  }
+}
 
+function getLiTimestamp(li) {
+  if (li.dataset.iso) {
+    const t = new Date(li.dataset.iso + 'T00:00:00').getTime();
+    if (!isNaN(t)) return t;
+  }
+  return Infinity;
+}
+
+function renumberDates() {
+  const items = [...document.querySelectorAll('.timeline li[data-event-type="date"]')];
+  items.sort((a, b) => getLiTimestamp(a) - getLiTimestamp(b));
+  items.forEach((li, i) => {
+    const data = li.querySelector('.data');
+    if (data) data.dataset.number = i + 1;
+  });
+}
+
+function addTimelineItem(event, save = false) {
+  const { title, date, descriptionDeni, descriptionErty, eventType } = event;
+
+  const li = document.createElement('li');
+  li.dataset.iso = date;
+  li.dataset.eventType = eventType;
+  li.setAttribute('data-date', formatDate(date));
+
+  li.innerHTML = `
+    <span class="title">${escapeHtml(title)}</span>
+    <div class="data ${eventType === 'skip' ? 'skip-class' : ''}">
+      <h3>${escapeHtml(title)}</h3>
+      <small>${formatDate(date)}</small>
+      <p class="deni-comment">${escapeHtml(descriptionDeni || '')}</p>
+      <p class="erty-comment">${escapeHtml(descriptionErty || '')}</p>
+      <span class="close">Click to close</span>
+    </div>
+  `;
+
+  const ts = new Date(date + 'T00:00:00').getTime();
+  const children = [...timeline.children];
+  let inserted = false;
+
+  for (const child of children) {
+    if (ts < getLiTimestamp(child)) {
+      timeline.insertBefore(li, child);
+      inserted = true;
+      break;
+    }
+  }
+  if (!inserted) timeline.appendChild(li);
+
+  wireDataHandlers(li.querySelector('.data'));
+  renumberDates();
+}
+
+/******************** FIRESTORE ********************/
+const eventsCol = collection(db, 'events');
+
+async function loadEventsFromFirebase() {
+  const snap = await getDocs(eventsCol);
+  snap.forEach(docSnap => addTimelineItem(docSnap.data()));
+  renumberDates();
+}
+
+async function saveEventToFirebase(event) {
+  await addDoc(eventsCol, {
+    ...event,
+    createdAt: serverTimestamp()
+  });
+}
+
+/******************** MODAL + FORM ********************/
+const showFormBtn = document.getElementById('showAddForm');
+const modal = document.getElementById('addEventModal');
+const closeModalBtn = document.getElementById('closeModal');
+const cancelBtn = document.getElementById('cancelAdd');
+const addForm = document.getElementById('addEventForm');
+
+function openModal() {
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+  addForm.reset();
+}
+
+showFormBtn.addEventListener('click', openModal);
+cancelBtn.addEventListener('click', closeModal);
+closeModalBtn.addEventListener('click', closeModal);
+
+addForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(addForm);
+
+  const event = {
+    title: fd.get('title').trim(),
+    date: fd.get('date'),
+    descriptionDeni: fd.get('descriptionDeni'),
+    descriptionErty: fd.get('descriptionErty'),
+    eventType: fd.get('eventType')
+  };
+
+  if (!event.title || !event.date || !event.eventType) {
+    alert('Missing fields');
+    return;
+  }
+
+  addTimelineItem(event);
+  await saveEventToFirebase(event);
+  closeModal();
+});
+
+/******************** LIVE COUNTERS ********************/
+(function () {
+  const contractDate = new Date('2025-12-03T11:30:00');
+  const turpishDate = new Date('2025-10-26T16:44:00');
+
+  const contractEl = document.getElementById('contractCounter');
+  const turpishEl = document.getElementById('turpishCounter');
+
+  function formatTime(diff) {
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    return `${d} days, ${h} hours, ${m} minutes`;
+  }
+
+  function update() {
+    const now = new Date();
+    contractEl.textContent = formatTime(now - contractDate);
+    turpishEl.textContent = formatTime(now - turpishDate);
+  }
+
+  update();
+  setInterval(update, 60000);
 })();
+
+/******************** INIT ********************/
+loadEventsFromFirebase();
+
+// Wire existing static timeline items
+document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
