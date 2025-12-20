@@ -28,15 +28,15 @@
         <div class="modal-dialog" role="document">
             <button id="closeModal" class="modal-close" aria-label="Close form">✕</button>
             <form id="addEventForm" class="add-event-form" aria-label="Add timeline event">
-                <input name="title" type="text" placeholder="Event title" required />
+                <input name="title" type="text" placeholder="Event title" />
                 <input name="date" type="date" required />
                 <select name="eventType" required>
                     <option value="">Kude?</option>
                     <option value="date">Date</option>
                     <option value="skip">Peika do Lidl</option>
-                    <option value="home">U Deni</option>
-                    <option value="home">U Erty</option>
-                    <option value="skip">Other</option>
+                    <option value="udeni">U Deni</option>
+                    <option value="uerty">U Erty</option>
+                    <option value="other">Other</option>
                 </select>
                 <label><input type="checkbox" name="specialEvent" /> Special Event</label>
 
@@ -98,6 +98,12 @@
                 </div>
             </div>
         </div>
+
+    <!-- Relationship Statistics Section -->
+    <h3 class="hints">Oshte statistics</h3>
+    <div id="relationshipStats">
+        <!-- Stats will be dynamically inserted here -->
+    </div>
 
     <h3 class="hints">Quotes</h3>
     <div class="controls">

@@ -113,8 +113,9 @@ function showContextMenu(x, y, li) {
       li.remove();
       renumberDates();
       
-      // Update calendar after deletion
+      // Update calendar and statistics after deletion
       if (window.updateCalendar) window.updateCalendar();
+      if (window.renderStatistics) window.renderStatistics();
     }
   });
 
@@ -194,8 +195,9 @@ async function addTimelineItem(event, docId = null) {
   wireDataHandlers(li.querySelector('.data'));
   renumberDates();
   
-  // Update calendar to reflect new event
+  // Update calendar and statistics to reflect new event
   if (window.updateCalendar) window.updateCalendar();
+  if (window.renderStatistics) window.renderStatistics();
 }
 
 /******************** FIRESTORE ********************/
@@ -206,8 +208,9 @@ async function loadEventsFromFirebase() {
   snap.forEach(docSnap => addTimelineItem(docSnap.data(), docSnap.id));
   renumberDates();
   
-  // Update calendar after loading all events
+  // Update calendar and statistics after loading all events
   if (window.updateCalendar) window.updateCalendar();
+  if (window.renderStatistics) window.renderStatistics();
 }
 
 async function saveEventToFirebase(event) {
@@ -383,8 +386,9 @@ addForm.addEventListener('submit', async e => {
     // Re-sort timeline items by date
     renumberDates();
     
-    // Update calendar after editing
+    // Update calendar and statistics after editing
     if (window.updateCalendar) window.updateCalendar();
+    if (window.renderStatistics) window.renderStatistics();
     
   } else {
     // ADD MODE: Create new event
@@ -580,4 +584,187 @@ document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
   // Re-render calendar when events change
   // We'll call this after adding/editing/deleting events
   window.updateCalendar = renderCalendar;
+})();
+
+/******************** RELATIONSHIP STATISTICS ********************/
+(function() {
+  function calculateStatistics() {
+    const timelineItems = document.querySelectorAll('.timeline li[data-iso]');
+    
+    // Total dates
+    const totalDates = timelineItems.length;
+    
+    // Location breakdown - categorize by type
+    let atHomeCount = 0;  // U Deni + U Erty
+    let goingOutCount = 0; // Dates, other places
+    let uDeniCount = 0;
+    let uErtyCount = 0;
+    
+    // Date tracking
+    const dates = [];
+    const monthCounts = {};
+    
+    // Debug: Log first 5 items to see what we're working with
+    console.log('📊 Statistics Debug:');
+    console.log('Total items:', timelineItems.length);
+    
+    timelineItems.forEach((item, index) => {
+      const eventType = item.dataset.eventType;
+      const dateStr = item.dataset.iso;
+      const title = item.querySelector('.title')?.textContent.toLowerCase() || '';
+      
+      // Debug first 5 items
+      if (index < 5) {
+        console.log(`Item ${index + 1}:`, { title, eventType });
+      }
+      
+      // Count locations - prioritize eventType, then check title as fallback
+      if (eventType === 'udeni') {
+        uDeniCount++;
+        atHomeCount++;
+      } else if (eventType === 'uerty') {
+        uErtyCount++;
+        atHomeCount++;
+      } else if (eventType === 'home') {
+        // Old "home" events - check title to determine location
+        if (title.includes('erty')) {
+          uErtyCount++;
+        } else {
+          uDeniCount++;
+        }
+        atHomeCount++;
+      } else {
+        // For everything else (date, skip, other)
+        goingOutCount++;
+      }
+      
+      // Track dates
+      if (dateStr) {
+        dates.push(new Date(dateStr));
+        
+        // Count by month
+        const monthKey = dateStr.substring(0, 7); // YYYY-MM
+        monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
+      }
+    });
+    
+    console.log('Counts:', { uDeniCount, uErtyCount, atHomeCount, goingOutCount });
+    
+    // Sort dates
+    dates.sort((a, b) => a - b);
+    
+    // First date
+    const firstDate = dates[0];
+    const daysSinceFirst = firstDate ? Math.floor((new Date() - firstDate) / (1000 * 60 * 60 * 24)) : 0;
+    
+    // Most active month
+    let mostActiveMonth = '';
+    let maxCount = 0;
+    for (const [month, count] of Object.entries(monthCounts)) {
+      if (count > maxCount) {
+        maxCount = count;
+        mostActiveMonth = month;
+      }
+    }
+    
+    // Format most active month
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    let mostActiveMonthFormatted = '';
+    if (mostActiveMonth) {
+      const [year, month] = mostActiveMonth.split('-');
+      mostActiveMonthFormatted = `${monthNames[parseInt(month) - 1]} ${year}`;
+    }
+    
+    // Average dates per week
+    const weeksSinceFirst = daysSinceFirst / 7;
+    const avgPerWeek = weeksSinceFirst > 0 ? (totalDates / weeksSinceFirst).toFixed(1) : 0;
+    
+    return {
+      totalDates,
+      uDeniCount,
+      uErtyCount,
+      atHomeCount,
+      goingOutCount,
+      daysSinceFirst,
+      mostActiveMonth: mostActiveMonthFormatted,
+      mostActiveCount: maxCount,
+      avgPerWeek
+    };
+  }
+
+  function renderStatistics() {
+    const stats = calculateStatistics();
+    const statsContainer = document.getElementById('relationshipStats');
+    
+    if (!statsContainer) return;
+    
+    statsContainer.innerHTML = `
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">💕</div>
+          <p class="stat-title">Total Dates</p>
+          <div class="stat-value">${stats.totalDates}</div>
+          <p class="stat-detail">memories together</p>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-icon">🏠</div>
+          <p class="stat-title">At Home</p>
+          <div class="location-breakdown">
+            <div class="location-item deni">
+              <div class="location-name">U Deni</div>
+              <div class="location-count">${stats.uDeniCount}</div>
+            </div>
+            <div class="location-item erty">
+              <div class="location-name">U Erty</div>
+              <div class="location-count">${stats.uErtyCount}</div>
+            </div>
+          </div>
+          <p class="stat-detail">${stats.atHomeCount} total at home</p>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">🎉</div>
+          <p class="stat-title">Going Out</p>
+          <div class="stat-value">${stats.goingOutCount}</div>
+          <p class="stat-detail">dates & adventures</p>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-icon">🔥</div>
+          <p class="stat-title">Most Active Month</p>
+          <div class="stat-value" style="font-size: 1.8rem;">${stats.mostActiveMonth || 'N/A'}</div>
+          <p class="stat-detail">${stats.mostActiveCount} dates that month</p>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-icon">📊</div>
+          <p class="stat-title">Average Dates</p>
+          <div class="stat-value">${stats.avgPerWeek}</div>
+          <p class="stat-detail">times per week</p>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-icon">${stats.uDeniCount > stats.uErtyCount ? '🏠' : '🏡'}</div>
+          <p class="stat-title">Favorite Spot</p>
+          <div class="stat-value" style="font-size: 1.5rem;">
+            ${stats.uDeniCount > stats.uErtyCount ? 'U Deni' : stats.uErtyCount > stats.uDeniCount ? 'U Erty' : 'Tie!'}
+          </div>
+          <p class="stat-detail">
+            ${stats.uDeniCount > stats.uErtyCount 
+              ? `${stats.uDeniCount - stats.uErtyCount} more visits` 
+              : stats.uErtyCount > stats.uDeniCount 
+              ? `${stats.uErtyCount - stats.uDeniCount} more visits`
+              : 'Equal visits'}
+          </p>
+        </div>
+      </div>
+    `;
+  }
+
+  // Make renderStatistics globally accessible
+  window.renderStatistics = renderStatistics;
+  
+  // Initial render
+  renderStatistics();
 })();

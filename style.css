@@ -340,16 +340,17 @@ h1{
 }
 #showAddForm span {
     position: absolute;
-    top: 30%
+    top: 45%;
+    left: 50%;
     transform: translate(-50%, -50%) rotate(45deg);
     font-family: 'Poppins', Arial, sans-serif;
-    font-size: 1.3rem;
-    font-weight: 600;
+    font-size: 1.8rem;
+    font-weight: 700;
     color: white;
     text-align: center;
     pointer-events: none;
     z-index: 20;
-    line-height: 2;
+    line-height: 1;
     white-space: nowrap;
 }
 
@@ -705,4 +706,94 @@ h1{
 
 .image-upload input[type="file"] {
   margin-top: 5px;
+}
+
+/* Relationship Statistics Section */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, rgba(186, 154, 237, 0.9), rgba(96, 54, 187, 0.9));
+    padding: 1rem;
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    color: white;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15);
+}
+
+.stat-card .stat-icon {
+    font-size: 2rem;
+    margin-bottom: 0.3rem;
+}
+
+.stat-card .stat-title {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin: 0;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat-card .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+    margin: 0.3rem 0;
+    font-family: 'Poppins', sans-serif;
+}
+
+.stat-card .stat-detail {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0;
+    font-style: italic;
+}
+
+.location-breakdown {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.location-item {
+    flex: 1;
+    text-align: center;
+}
+
+.location-item .location-name {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 0.3rem;
+}
+
+.location-item .location-count {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+}
+
+.location-item.deni .location-count {
+    color: #ffe4f5;
+}
+
+.location-item.erty .location-count {
+    color: #d4e4ff;
+}
+
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
 }
