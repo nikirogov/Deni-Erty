@@ -146,9 +146,7 @@ h1{
 
 }
 
-.data.skip-class {
-    background-color: #6A0DAD;
-}
+/* All event types use the same color now */
 
 .timeline li .title{
     top: 2.4rem;
@@ -293,7 +291,10 @@ h1{
 
 .controls {
     position: relative;
-    height: 120px; /* big enough for the heart button */
+    height: 120px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 
@@ -305,8 +306,6 @@ h1{
     border: none;
     cursor: pointer;
     transform: rotate(-45deg);
-    display: inline-block;
-    margin: 0 auto;
 }
 
 /* Create the rounded "lobes" */
@@ -318,6 +317,7 @@ h1{
     height: 80px;
     background-color: red;
     border-radius: 50%;
+    pointer-events: none;
 }
 
 #showAddForm::before {
@@ -340,32 +340,23 @@ h1{
 }
 #showAddForm span {
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 30%
     transform: translate(-50%, -50%) rotate(45deg);
     font-family: 'Poppins', Arial, sans-serif;
-    font-size: 1.5rem;  /* adjust as needed */
+    font-size: 1.3rem;
     font-weight: 600;
     color: white;
-    text-align: center;   /* center multi-line text */
+    text-align: center;
     pointer-events: none;
     z-index: 20;
-    line-height: 1.2;     /* compact lines to fit nicely */
-    white-space: pre-line; /* respect line breaks */
-    width: 70px;           /* constrain width to heart shape */
+    line-height: 2;
+    white-space: nowrap;
 }
 
 
 
 
-.controls { position: relative; height: 3rem; } /* give parent a height */
-.controls button {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 7rem;
-}
+/* Heart button controls - styles above handle centering */
 /* Add event form - compact, responsive */
 .add-event-form {
     display: flex;
@@ -566,34 +557,101 @@ h1{
 #calendarHeading{
     display: flex;
     justify-content: space-between;
-    padding: 0px 20px;
+    align-items: center;
+    padding: 10px 20px;
     background-color: var(--secondary-color);
     border-radius: 10px 10px 0 0;
     border: 2px solid #000000;
     font-size: 20px;
     background-color: #7d39ea;
-    line-height: 0px;
+    line-height: 1.2;
 }
 
-.days{
-    display: flex;
+#calendarHeading p {
+    margin: 0.5rem 0;
 }
-#tracker{
-    padding-top: 10px;
+
+/* Calendar navigation buttons */
+.calendar-nav {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.8rem;
+    padding: 0.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    line-height: 1;
 }
+
+.calendar-nav:hover {
+    transform: scale(1.3);
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+}
+
+.calendar-nav:active {
+    transform: scale(1.1);
+}
+
+/* Weekday labels */
+#weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    padding: 10px 3px 5px 3px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #333;
+}
+
+#weekdays span {
+    text-align: center;
+}
+
+/* Calendar grid */
+#tracker {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+    padding: 10px 3px;
+}
+
 .day{
-    width: 30px;
-    height: 30px;
-    margin: 3px;
+    width: 35px;
+    height: 35px;
+    margin: 0;
     padding: 0;
-    font-size: 15px;
-    border-radius: 30px;
+    font-size: 14px;
+    border-radius: 50%;
     text-align: center;
     background-color: rgba(139, 58, 244, 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background-color 0.3s;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.day:hover:not(.empty) {
+    background-color: rgba(139, 58, 244, 0.4);
+    transform: scale(1.05);
+}
+
+.day.empty {
+    background-color: transparent;
+    cursor: default;
+}
+
+/* Days with events - highlighted in purple */
+.day.has-event {
+    background-color: rgb(139, 58, 244);
+    color: white;
+    font-weight: bold;
+}
+
+/* Today's date - red border */
+.day.today {
+    border: 2px solid #ff6b6b;
+    box-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
 }
 
 .day.active {

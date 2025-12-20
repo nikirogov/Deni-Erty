@@ -73,59 +73,27 @@
         <h5>Turpim se ot:</h5>
         <p id="turpishCounter" class="counter">Loading...</p>
     </div>
-    <div class="stat-item">
-        <h5>Streak:</h5>
-        <p id="streakCounter" class="counter">Loading...</p>
-    </div>
+
     <div id="calenderContainer">
             <div id = "calendarDiv">
                 <div id="calendarHeading">
+                    <button id="prevMonth" class="calendar-nav" aria-label="Previous month">◄</button>
                     <p id="habitTitle">Month</p>
+                    <button id="nextMonth" class="calendar-nav" aria-label="Next month">►</button>
                     <p id="totalDays">0/31</p>
                 </div>
                 <div id="calendarContent">
+                    <div id="weekdays" class="weekday-labels">
+                        <span>Mon</span>
+                        <span>Tue</span>
+                        <span>Wed</span>
+                        <span>Thu</span>
+                        <span>Fri</span>
+                        <span>Sat</span>
+                        <span>Sun</span>
+                    </div>
                     <div id="tracker">
-                        <div class="days">
-                            <div class="day">1</div>
-                            <div class="day">2</div>
-                            <div class="day">3</div>
-                            <div class="day">4</div>
-                            <div class="day">5</div>
-                            <div class="day">6</div>
-                            <div class="day">7</div>
-                        </div>
-                        <div class="days">
-                            <div class="day">8</div>
-                            <div class="day">9</div>
-                            <div class="day">10</div>
-                            <div class="day">11</div>
-                            <div class="day">12</div>
-                            <div class="day">13</div>
-                            <div class="day">14</div>
-                        </div>
-                        <div class="days">
-                            <div class="day">15</div>
-                            <div class="day">16</div>
-                            <div class="day">17</div>
-                            <div class="day">18</div>
-                            <div class="day">19</div>
-                            <div class="day">20</div>
-                            <div class="day">21</div>
-                        </div>
-                        <div class="days">
-                            <div class="day">22</div>
-                            <div class="day">23</div>
-                            <div class="day">24</div>
-                            <div class="day">25</div>
-                            <div class="day">26</div>
-                            <div class="day">27</div>
-                            <div class="day">28</div>
-                        </div>
-                        <div class="days">
-                            <div class="day">29</div>
-                            <div class="day">30</div>
-                            <div class="day">31</div>
-                        </div>
+                        <!-- Calendar days will be dynamically generated -->
                     </div>
                 </div>
             </div>

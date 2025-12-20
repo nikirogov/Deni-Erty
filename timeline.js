@@ -11,16 +11,7 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyC2IslvkWwdui2qwiXdp5U1eRaNAQlKSuY",
-  authDomain: "deni-erty.firebaseapp.com",
-  projectId: "deni-erty",
-  storageBucket: "deni-erty.firebasestorage.app",
-  messagingSenderId: "61059861990",
-  appId: "1:61059861990:web:6c3d502aaecbe1f40c5a27",
-  measurementId: "G-TJVS4LYBF2"
-};
-
+import { firebaseConfig } from './firebase-config.js';
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
@@ -121,6 +112,9 @@ function showContextMenu(x, y, li) {
       if (docId) await deleteDoc(doc(db, 'events', docId));
       li.remove();
       renumberDates();
+      
+      // Update calendar after deletion
+      if (window.updateCalendar) window.updateCalendar();
     }
   });
 
@@ -199,6 +193,9 @@ async function addTimelineItem(event, docId = null) {
 
   wireDataHandlers(li.querySelector('.data'));
   renumberDates();
+  
+  // Update calendar to reflect new event
+  if (window.updateCalendar) window.updateCalendar();
 }
 
 /******************** FIRESTORE ********************/
@@ -208,6 +205,9 @@ async function loadEventsFromFirebase() {
   const snap = await getDocs(eventsCol);
   snap.forEach(docSnap => addTimelineItem(docSnap.data(), docSnap.id));
   renumberDates();
+  
+  // Update calendar after loading all events
+  if (window.updateCalendar) window.updateCalendar();
 }
 
 async function saveEventToFirebase(event) {
@@ -238,9 +238,9 @@ function closeModal() {
   addForm.reset();
   editingLi = null; // Clear edit mode
   
-  // Reset button text back to "Add Event"
+  // Reset button text back to "Add"
   const submitBtn = addForm.querySelector('button[type="submit"]');
-  submitBtn.textContent = 'Add Event';
+  submitBtn.textContent = 'Add';
 }
 
 showFormBtn.addEventListener('click', openModal);
@@ -383,6 +383,9 @@ addForm.addEventListener('submit', async e => {
     // Re-sort timeline items by date
     renumberDates();
     
+    // Update calendar after editing
+    if (window.updateCalendar) window.updateCalendar();
+    
   } else {
     // ADD MODE: Create new event
     const docId = await saveEventToFirebase(event);
@@ -419,3 +422,162 @@ addForm.addEventListener('submit', async e => {
 /******************** INIT ********************/
 loadEventsFromFirebase();
 document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
+
+/******************** CALENDAR NAVIGATION ********************/
+(function() {
+  // Calendar state - tracks which month we're currently viewing
+  let currentDate = new Date();
+  
+  // Get DOM elements
+  const habitTitle = document.getElementById('habitTitle');
+  const totalDays = document.getElementById('totalDays');
+  const tracker = document.getElementById('tracker');
+  const prevBtn = document.getElementById('prevMonth');
+  const nextBtn = document.getElementById('nextMonth');
+
+  // Month names for display
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  /**
+   * RENDER CALENDAR
+   * This function generates the calendar grid for the current month
+   * It creates divs for each day and marks special dates
+   */
+  function renderCalendar() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    
+    // Update the title to show current month and year
+    habitTitle.textContent = `${monthNames[month]} ${year}`;
+    
+    // Calculate calendar details
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    
+    // getDay() returns 0-6 (Sun-Sat), we want Mon=0, so adjust
+    let firstDayOfWeek = firstDay.getDay() - 1;
+    if (firstDayOfWeek === -1) firstDayOfWeek = 6; // Sunday becomes 6
+    
+    // Clear existing calendar
+    tracker.innerHTML = '';
+    
+    // Count events for this month
+    let eventCount = 0;
+    
+    // Create calendar grid
+    let dayCounter = 1;
+    let totalCells = Math.ceil((firstDayOfWeek + daysInMonth) / 7) * 7;
+    
+    for (let i = 0; i < totalCells; i++) {
+      const dayDiv = document.createElement('div');
+      dayDiv.classList.add('day');
+      
+      // Empty cells before month starts
+      if (i < firstDayOfWeek) {
+        dayDiv.classList.add('empty');
+        tracker.appendChild(dayDiv);
+        continue;
+      }
+      
+      // Days of the month
+      if (dayCounter <= daysInMonth) {
+        dayDiv.textContent = dayCounter;
+        dayDiv.dataset.day = dayCounter;
+        
+        // Check if this date has an event
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayCounter).padStart(2, '0')}`;
+        if (hasEventOnDate(dateStr)) {
+          dayDiv.classList.add('has-event');
+          eventCount++;
+        }
+        
+        // Highlight today
+        const today = new Date();
+        if (year === today.getFullYear() && 
+            month === today.getMonth() && 
+            dayCounter === today.getDate()) {
+          dayDiv.classList.add('today');
+        }
+        
+        dayCounter++;
+      } else {
+        // Empty cells after month ends
+        dayDiv.classList.add('empty');
+      }
+      
+      tracker.appendChild(dayDiv);
+    }
+    
+    // Update total days counter
+    totalDays.textContent = `${eventCount}/${daysInMonth}`;
+  }
+
+  /**
+   * CHECK IF DATE HAS EVENT
+   * Looks through timeline items to see if any match the given date
+   */
+  function hasEventOnDate(dateStr) {
+    const timelineItems = document.querySelectorAll('.timeline li[data-iso]');
+    
+    // Debug: Log the first time to see what dates we have
+    if (window.calendarDebugOnce !== true) {
+      console.log('📅 Calendar Debug: Checking events');
+      console.log('Total timeline items with dates:', timelineItems.length);
+      if (timelineItems.length > 0) {
+        console.log('Sample dates:', Array.from(timelineItems).slice(0, 3).map(item => item.dataset.iso));
+      }
+      window.calendarDebugOnce = true;
+    }
+    
+    for (const item of timelineItems) {
+      if (item.dataset.iso === dateStr) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * NAVIGATION FUNCTIONS
+   * Move backward/forward through months
+   */
+  function goToPreviousMonth() {
+    currentDate.setMonth(currentDate.getMonth() - 1);
+    renderCalendar();
+  }
+
+  function goToNextMonth() {
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    renderCalendar();
+  }
+
+  // Add event listeners to navigation buttons
+  prevBtn.addEventListener('click', goToPreviousMonth);
+  nextBtn.addEventListener('click', goToNextMonth);
+
+  // Allow keyboard navigation
+  prevBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      goToPreviousMonth();
+    }
+  });
+
+  nextBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      goToNextMonth();
+    }
+  });
+
+  // Initial render
+  renderCalendar();
+
+  // Re-render calendar when events change
+  // We'll call this after adding/editing/deleting events
+  window.updateCalendar = renderCalendar;
+})();
