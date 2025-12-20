@@ -6,6 +6,7 @@ import {
   addDoc,
   getDocs,
   deleteDoc,
+  updateDoc,
   doc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -42,6 +43,9 @@ function formatDate(dateValue) {
 const timelineWrapper = document.querySelector('.timeline-wrapper');
 const timeline = document.querySelector('.timeline');
 
+// Context menu variable - holds reference to the currently open menu
+let contextMenu = null;
+
 function wireDataHandlers(el) {
   const li = el.closest('li');
 
@@ -64,6 +68,80 @@ function wireDataHandlers(el) {
         renumberDates();
       }
     });
+  }
+
+  // RIGHT-CLICK CONTEXT MENU
+  // This listens for right-clicks on the timeline item
+  li.addEventListener('contextmenu', e => {
+    e.preventDefault(); // Prevents the browser's default right-click menu
+    showContextMenu(e.clientX, e.clientY, li); // Show our custom menu at mouse position
+  });
+}
+
+// SHOW CONTEXT MENU
+// This function creates and displays the right-click menu
+function showContextMenu(x, y, li) {
+  hideContextMenu(); // First, close any existing menu
+  
+  // Create the menu container (a div element)
+  contextMenu = document.createElement('div');
+  contextMenu.style.cssText = 'position:fixed;background:#fff;border:1px solid #ccc;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.15);z-index:10000;padding:0.3rem 0;';
+  contextMenu.style.left = x + 'px'; // Position at mouse X
+  contextMenu.style.top = y + 'px';  // Position at mouse Y
+
+  // Create "Edit" button
+  const editBtn = document.createElement('button');
+  editBtn.textContent = 'Edit';
+  editBtn.style.cssText = 'display:block;width:100%;padding:0.4rem 1rem;background:none;border:none;text-align:left;cursor:pointer;';
+  
+  // Hover effects for Edit button
+  editBtn.addEventListener('mouseenter', () => editBtn.style.background = '#f0f0f0');
+  editBtn.addEventListener('mouseleave', () => editBtn.style.background = 'none');
+  
+  // When Edit is clicked, close menu and open edit mode
+  editBtn.addEventListener('click', () => {
+    hideContextMenu();
+    editTimelineItem(li);
+  });
+
+  // Create "Delete" button
+  const deleteBtn = document.createElement('button');
+  deleteBtn.textContent = 'Delete';
+  deleteBtn.style.cssText = 'display:block;width:100%;padding:0.4rem 1rem;background:none;border:none;text-align:left;cursor:pointer;color:#d32f2f;';
+  
+  // Hover effects for Delete button
+  deleteBtn.addEventListener('mouseenter', () => deleteBtn.style.background = '#ffebee');
+  deleteBtn.addEventListener('mouseleave', () => deleteBtn.style.background = 'none');
+  
+  // When Delete is clicked, confirm and remove the event
+  deleteBtn.addEventListener('click', async () => {
+    hideContextMenu();
+    if (confirm('Delete this event?')) {
+      const docId = li.dataset.docId;
+      if (docId) await deleteDoc(doc(db, 'events', docId));
+      li.remove();
+      renumberDates();
+    }
+  });
+
+  // Add both buttons to the menu
+  contextMenu.appendChild(editBtn);
+  contextMenu.appendChild(deleteBtn);
+  document.body.appendChild(contextMenu); // Add menu to the page
+
+  // Close menu when clicking anywhere outside
+  // setTimeout ensures this listener is added AFTER the current click finishes
+  setTimeout(() => {
+    document.addEventListener('click', hideContextMenu, { once: true });
+  }, 0);
+}
+
+// HIDE CONTEXT MENU
+// Removes the context menu from the page
+function hideContextMenu() {
+  if (contextMenu) {
+    contextMenu.remove(); // Remove the menu element
+    contextMenu = null;   // Clear the reference
   }
 }
 
@@ -147,6 +225,9 @@ const closeModalBtn = document.getElementById('closeModal');
 const cancelBtn = document.getElementById('cancelAdd');
 const addForm = document.getElementById('addEventForm');
 
+// Variable to track if we're in edit mode
+let editingLi = null;
+
 function openModal() {
   modal.setAttribute('aria-hidden', 'false');
   document.body.style.overflow = 'hidden';
@@ -155,11 +236,64 @@ function closeModal() {
   modal.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
   addForm.reset();
+  editingLi = null; // Clear edit mode
+  
+  // Reset button text back to "Add Event"
+  const submitBtn = addForm.querySelector('button[type="submit"]');
+  submitBtn.textContent = 'Add Event';
 }
 
 showFormBtn.addEventListener('click', openModal);
 cancelBtn.addEventListener('click', closeModal);
 closeModalBtn.addEventListener('click', closeModal);
+
+// EDIT TIMELINE ITEM FUNCTION
+// This function opens the form modal with existing event data for editing
+function editTimelineItem(li) {
+  const dataEl = li.querySelector('.data');
+  const titleSpan = li.querySelector('.title');
+  const h3 = dataEl.querySelector('h3');
+  const deniP = dataEl.querySelector('.deni-comment');
+  const ertyP = dataEl.querySelector('.erty-comment');
+
+  // Extract current values from the timeline item
+  const currentTitle = titleSpan.textContent.trim();
+  const currentDescDeni = deniP ? deniP.textContent.trim() : '';
+  const currentDescErty = ertyP ? ertyP.textContent.trim() : '';
+  const currentEventType = li.dataset.eventType || 'other';
+  const currentSpecialEvent = li.classList.contains('special-event');
+
+  // Get form inputs
+  const titleInput = addForm.querySelector('[name="title"]');
+  const dateInput = addForm.querySelector('[name="date"]');
+  const descDeniInput = addForm.querySelector('[name="descriptionDeni"]');
+  const descErtyInput = addForm.querySelector('[name="descriptionErty"]');
+  const eventTypeInput = addForm.querySelector('[name="eventType"]');
+  const specialEventInput = addForm.querySelector('[name="specialEvent"]');
+  const submitBtn = addForm.querySelector('button[type="submit"]');
+
+  // Pre-fill the form with current values
+  titleInput.value = currentTitle;
+  
+  // Use the stored ISO date if available
+  if (li.dataset.iso) {
+    dateInput.value = li.dataset.iso;
+  }
+  
+  descDeniInput.value = currentDescDeni;
+  descErtyInput.value = currentDescErty;
+  eventTypeInput.value = currentEventType;
+  specialEventInput.checked = currentSpecialEvent;
+
+  // Change button text to indicate edit mode
+  submitBtn.textContent = 'Save Changes';
+
+  // Store reference to the item being edited
+  editingLi = li;
+
+  // Open the modal
+  openModal();
+}
 
 addForm.addEventListener('submit', async e => {
   e.preventDefault();
@@ -191,8 +325,70 @@ addForm.addEventListener('submit', async e => {
     return;
   }
 
-  const docId = await saveEventToFirebase(event);
-  addTimelineItem(event, docId);
+  // CHECK IF WE'RE EDITING OR ADDING
+  if (editingLi) {
+    // EDIT MODE: Update existing event
+    const docId = editingLi.dataset.docId;
+    
+    // Update in Firebase
+    if (docId) {
+      await updateDoc(doc(db, 'events', docId), event);
+    }
+    
+    // Update the DOM element
+    const dataEl = editingLi.querySelector('.data');
+    const titleSpan = editingLi.querySelector('.title');
+    const h3 = dataEl.querySelector('h3');
+    const small = dataEl.querySelector('small');
+    const deniP = dataEl.querySelector('.deni-comment');
+    const ertyP = dataEl.querySelector('.erty-comment');
+
+    // Update text content
+    titleSpan.textContent = event.title;
+    h3.textContent = event.title;
+    small.textContent = formatDate(event.date);
+    if (deniP) deniP.textContent = event.descriptionDeni || '';
+    if (ertyP) ertyP.textContent = event.descriptionErty || '';
+
+    // Update data attributes
+    editingLi.setAttribute('data-date', formatDate(event.date));
+    editingLi.dataset.iso = event.date;
+    editingLi.dataset.eventType = event.eventType;
+
+    // Update class based on event type
+    dataEl.className = event.eventType === 'skip' ? 'data skip-class' : 'data';
+    
+    // Update special event styling
+    if (event.specialEvent) {
+      editingLi.classList.add('special-event');
+    } else {
+      editingLi.classList.remove('special-event');
+    }
+
+    // Handle image update if provided
+    if (imgData) {
+      let img = dataEl.querySelector('.event-image');
+      if (img) {
+        img.src = imgData;
+      } else {
+        // Insert new image before h3
+        img = document.createElement('img');
+        img.src = imgData;
+        img.alt = 'Event image';
+        img.className = 'event-image';
+        dataEl.insertBefore(img, h3);
+      }
+    }
+
+    // Re-sort timeline items by date
+    renumberDates();
+    
+  } else {
+    // ADD MODE: Create new event
+    const docId = await saveEventToFirebase(event);
+    addTimelineItem(event, docId);
+  }
+
   closeModal();
 });
 
