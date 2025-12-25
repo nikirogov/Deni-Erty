@@ -105,38 +105,65 @@
         <!-- Stats will be dynamically inserted here -->
     </div>
 
-    <h3 class="hints">Quotes</h3>
+    <!-- Date Ideas Section -->
+    <h3 class="hints">Date Ideas</h3>
+    
     <div class="controls">
-        <button id="showAddQuote" type="button">Add Quote</button>
+        <button id="showAddDateIdea" type="button" class="purple-btn">Add Date Idea</button>
     </div>
 
-    <!-- Modal add-quote form -->
-    <div id="addQuoteModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+    <!-- Scheduled Dates -->
+    <div id="scheduledDatesSection" style="margin-bottom: 2rem;">
+        <h4 style="color: var(--deni-color); margin-bottom: 1rem;">📅 Scheduled Dates</h4>
+        <div id="scheduledDatesList" class="scheduled-dates-list">
+            <!-- Scheduled dates will appear here -->
+        </div>
+    </div>
+
+    <!-- Modal add-date-idea form -->
+    <div id="addDateIdeaModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
         <div class="modal-dialog" role="document">
-            <button id="closeQuoteModal" class="modal-close" aria-label="Close form">✕</button>
-            <form id="addQuoteForm" class="add-event-form" aria-label="Add quote">
-                <textarea name="quote" placeholder="Quote text" required></textarea>
-                <select name="person" id="personSelect" required>
-                    <option value="">Koj?</option>
-                    <option value="deni">Deni</option>
-                    <option value="erty">Erty</option>
-                    <option value="other">Other</option>
-                </select>
-                <input name="personName" id="personNameInput" type="text" placeholder="Name (if Other)" style="display: none;" />
+            <button id="closeDateIdeaModal" class="modal-close" aria-label="Close form">✕</button>
+            <form id="addDateIdeaForm" class="add-event-form" aria-label="Add date idea">
+                <input name="title" type="text" placeholder="Date idea title" required />
+                <input name="place" type="text" placeholder="Place (optional)" />
+                <textarea name="description" placeholder="Description (optional)"></textarea>
                 <div class="form-actions">
-                    <button type="submit">Add Quote</button>
-                    <button type="button" id="cancelAddQuote">Cancel</button>
+                    <button type="submit">Add Idea</button>
+                    <button type="button" id="cancelAddDateIdea">Cancel</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <ul id="quotesList" class="quotes-list"></ul>
+    <ul id="dateIdeasList" class="date-ideas-list"></ul>
 
-    <h3 class="hints">Kakwo da kaja na Deni?</h3>
+    <!-- Shared Photos Section -->
+    <h3 class="hints">Our Photos</h3>
+    
     <div class="controls">
-        <button id="showAddQuote" type="button">Umna misul</button>
+        <button id="showAddPhoto" type="button" class="purple-btn">Upload Photo</button>
     </div>
+
+    <!-- Modal add-photo form -->
+    <div id="addPhotoModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="modal-dialog" role="document">
+            <button id="closePhotoModal" class="modal-close" aria-label="Close form">✕</button>
+            <form id="addPhotoForm" class="add-event-form" aria-label="Add photo">
+                <input name="caption" type="text" placeholder="Caption (optional)" />
+                <div class="file-input-wrapper">
+                    <label for="photoFileInput" style="display: block; margin-bottom: 0.5rem; color: #222; font-weight: 500;">Select Photo:</label>
+                    <input type="file" id="photoFileInput" name="photoFile" accept="image/*" required />
+                </div>
+                <div class="form-actions">
+                    <button type="submit">Upload</button>
+                    <button type="button" id="cancelAddPhoto">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="photoGallery" class="photo-gallery"></div>
 </div>
 
 <script type="module" src="timeline.js"></script>

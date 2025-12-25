@@ -768,3 +768,407 @@ document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
   // Initial render
   renderStatistics();
 })();
+
+/******************** DATE IDEAS ********************/
+(function() {
+  const showDateIdeaBtn = document.getElementById('showAddDateIdea');
+  const dateIdeaModal = document.getElementById('addDateIdeaModal');
+  const closeDateIdeaModalBtn = document.getElementById('closeDateIdeaModal');
+  const cancelDateIdeaBtn = document.getElementById('cancelAddDateIdea');
+  const addDateIdeaForm = document.getElementById('addDateIdeaForm');
+  const dateIdeasList = document.getElementById('dateIdeasList');
+  const scheduledDatesList = document.getElementById('scheduledDatesList');
+  
+  const dateIdeasCol = collection(db, 'dateIdeas');
+
+  // Modal controls
+  function openDateIdeaModal() {
+    dateIdeaModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  
+  function closeDateIdeaModal() {
+    dateIdeaModal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    addDateIdeaForm.reset();
+  }
+
+  showDateIdeaBtn.addEventListener('click', openDateIdeaModal);
+  closeDateIdeaModalBtn.addEventListener('click', closeDateIdeaModal);
+  cancelDateIdeaBtn.addEventListener('click', closeDateIdeaModal);
+
+  // Add date idea
+  addDateIdeaForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(addDateIdeaForm);
+    
+    const dateIdea = {
+      title: fd.get('title').trim(),
+      place: fd.get('place').trim() || null,
+      description: fd.get('description').trim() || null,
+      scheduled: false,
+      scheduledDate: null,
+      createdAt: serverTimestamp()
+    };
+
+    if (!dateIdea.title) {
+      alert('Please enter a title');
+      return;
+    }
+
+    const docRef = await addDoc(dateIdeasCol, dateIdea);
+    renderDateIdea(dateIdea, docRef.id);
+    closeDateIdeaModal();
+  });
+
+  // Render single date idea
+  function renderDateIdea(idea, docId) {
+    const li = document.createElement('li');
+    li.classList.add('date-idea-item');
+    li.dataset.docId = docId;
+    
+    if (idea.scheduled) {
+      li.classList.add('scheduled');
+    }
+
+    const placeText = idea.place ? `<span class="idea-place">📍 ${escapeHtml(idea.place)}</span>` : '';
+    const descText = idea.description ? `<p class="idea-description">${escapeHtml(idea.description)}</p>` : '';
+    const scheduleDate = idea.scheduledDate ? `<span class="scheduled-date">📅 ${formatDate(idea.scheduledDate)}</span>` : '';
+
+    li.innerHTML = `
+      <div class="idea-content">
+        <h4 class="idea-title">${escapeHtml(idea.title)}</h4>
+        ${placeText}
+        ${descText}
+        ${scheduleDate}
+      </div>
+      <div class="idea-actions">
+        ${!idea.scheduled ? '<button class="schedule-btn">Schedule</button>' : '<button class="unschedule-btn">Unschedule</button>'}
+      </div>
+    `;
+
+    // Right-click context menu for delete
+    li.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (confirm('Delete this date idea?')) {
+        deleteDoc(doc(db, 'dateIdeas', docId));
+        li.remove();
+        updateScheduledDatesDisplay();
+      }
+    });
+
+    // Schedule button
+    const scheduleBtn = li.querySelector('.schedule-btn');
+    if (scheduleBtn) {
+      scheduleBtn.addEventListener('click', async () => {
+        // Create a date picker modal
+        const dateInput = document.createElement('input');
+        dateInput.type = 'date';
+        dateInput.style.cssText = 'padding: 0.5rem; font-size: 1rem; border: 2px solid var(--secondary-color); border-radius: 0.5rem;';
+        
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+        
+        const dialog = document.createElement('div');
+        dialog.style.cssText = 'background: white; padding: 2rem; border-radius: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.2);';
+        
+        const title = document.createElement('h3');
+        title.textContent = 'Select Date';
+        title.style.cssText = 'margin: 0 0 1rem 0; color: var(--secondary-color);';
+        
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = 'display: flex; gap: 0.5rem; margin-top: 1rem;';
+        
+        const confirmBtn = document.createElement('button');
+        confirmBtn.textContent = 'Schedule';
+        confirmBtn.style.cssText = 'padding: 0.5rem 1rem; background: var(--secondary-color); color: white; border: none; border-radius: 0.5rem; cursor: pointer; font-weight: 600;';
+        
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.style.cssText = 'padding: 0.5rem 1rem; background: #999; color: white; border: none; border-radius: 0.5rem; cursor: pointer;';
+        
+        confirmBtn.addEventListener('click', async () => {
+          if (dateInput.value) {
+            await updateDoc(doc(db, 'dateIdeas', docId), {
+              scheduled: true,
+              scheduledDate: dateInput.value
+            });
+            await loadDateIdeas();
+            modal.remove();
+          } else {
+            alert('Please select a date');
+          }
+        });
+        
+        cancelBtn.addEventListener('click', () => modal.remove());
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) modal.remove();
+        });
+        
+        buttonContainer.appendChild(confirmBtn);
+        buttonContainer.appendChild(cancelBtn);
+        dialog.appendChild(title);
+        dialog.appendChild(dateInput);
+        dialog.appendChild(buttonContainer);
+        modal.appendChild(dialog);
+        document.body.appendChild(modal);
+        dateInput.focus();
+      });
+    }
+
+    // Unschedule button
+    const unscheduleBtn = li.querySelector('.unschedule-btn');
+    if (unscheduleBtn) {
+      unscheduleBtn.addEventListener('click', async () => {
+        await updateDoc(doc(db, 'dateIdeas', docId), {
+          scheduled: false,
+          scheduledDate: null
+        });
+        await loadDateIdeas();
+      });
+    }
+
+    // Add to appropriate list
+    if (idea.scheduled) {
+      const scheduledItem = li.cloneNode(true);
+      
+      // Right-click to delete scheduled item
+      scheduledItem.addEventListener('contextmenu', async (e) => {
+        e.preventDefault();
+        if (confirm('Delete this date idea?')) {
+          await deleteDoc(doc(db, 'dateIdeas', docId));
+          await loadDateIdeas();
+        }
+      });
+      
+      scheduledItem.querySelector('.unschedule-btn').addEventListener('click', async () => {
+        await updateDoc(doc(db, 'dateIdeas', docId), {
+          scheduled: false,
+          scheduledDate: null
+        });
+        await loadDateIdeas();
+      });
+      
+      // Insert scheduled items sorted by date
+      const existingScheduled = [...scheduledDatesList.children];
+      let inserted = false;
+      for (const existing of existingScheduled) {
+        const existingDate = existing.querySelector('.scheduled-date')?.textContent.replace('📅 ', '') || '';
+        if (idea.scheduledDate < existingDate) {
+          scheduledDatesList.insertBefore(scheduledItem, existing);
+          inserted = true;
+          break;
+        }
+      }
+      if (!inserted) {
+        scheduledDatesList.appendChild(scheduledItem);
+      }
+    }
+    
+    dateIdeasList.appendChild(li);
+  }
+
+  // Load all date ideas from Firebase
+  async function loadDateIdeas() {
+    dateIdeasList.innerHTML = '';
+    scheduledDatesList.innerHTML = '';
+    
+    const snap = await getDocs(dateIdeasCol);
+    const ideas = [];
+    snap.forEach(docSnap => {
+      ideas.push({ ...docSnap.data(), docId: docSnap.id });
+    });
+    
+    // Sort: unscheduled first, then scheduled by date
+    ideas.sort((a, b) => {
+      if (a.scheduled && !b.scheduled) return 1;
+      if (!a.scheduled && b.scheduled) return -1;
+      if (a.scheduled && b.scheduled) {
+        return (a.scheduledDate || '').localeCompare(b.scheduledDate || '');
+      }
+      return 0;
+    });
+    
+    ideas.forEach(idea => renderDateIdea(idea, idea.docId));
+    updateScheduledDatesDisplay();
+  }
+
+  function updateScheduledDatesDisplay() {
+    const scheduledSection = document.getElementById('scheduledDatesSection');
+    if (scheduledDatesList.children.length === 0) {
+      scheduledDatesList.innerHTML = '<p style="color: #999; font-style: italic;">No scheduled dates yet</p>';
+    }
+  }
+
+  // Initial load
+  loadDateIdeas();
+})();
+
+/******************** SHARED PHOTOS GALLERY ********************/
+(function() {
+  const showPhotoBtn = document.getElementById('showAddPhoto');
+  const photoModal = document.getElementById('addPhotoModal');
+  const closePhotoModalBtn = document.getElementById('closePhotoModal');
+  const cancelPhotoBtn = document.getElementById('cancelAddPhoto');
+  const addPhotoForm = document.getElementById('addPhotoForm');
+  const photoGallery = document.getElementById('photoGallery');
+  
+  // Check if all elements exist
+  if (!showPhotoBtn || !photoModal || !closePhotoModalBtn || !cancelPhotoBtn || !addPhotoForm || !photoGallery) {
+    console.error('Photo gallery elements not found:', {
+      showPhotoBtn: !!showPhotoBtn,
+      photoModal: !!photoModal,
+      closePhotoModalBtn: !!closePhotoModalBtn,
+      cancelPhotoBtn: !!cancelPhotoBtn,
+      addPhotoForm: !!addPhotoForm,
+      photoGallery: !!photoGallery
+    });
+    return;
+  }
+  
+  const photosCol = collection(db, 'sharedPhotos');
+
+  // Modal controls
+  function openPhotoModal() {
+    photoModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  
+  function closePhotoModal() {
+    photoModal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    addPhotoForm.reset();
+  }
+
+  showPhotoBtn.addEventListener('click', openPhotoModal);
+  closePhotoModalBtn.addEventListener('click', closePhotoModal);
+  cancelPhotoBtn.addEventListener('click', closePhotoModal);
+
+  // Add photo
+  addPhotoForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(addPhotoForm);
+    
+    const file = fd.get('photoFile');
+    if (!file || file.size === 0) {
+      alert('Please select a photo');
+      return;
+    }
+
+    try {
+      // Compress and convert image to base64
+      const imageData = await compressImage(file);
+
+      const photo = {
+        caption: fd.get('caption').trim() || null,
+        imageData: imageData,
+        uploadedAt: serverTimestamp()
+      };
+
+      const docRef = await addDoc(photosCol, photo);
+      renderPhoto(photo, docRef.id);
+      closePhotoModal();
+    } catch (error) {
+      console.error('Error uploading photo:', error);
+      alert('Failed to upload photo: ' + error.message);
+    }
+  });
+
+  // Compress image to fit Firestore limits
+  function compressImage(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Create canvas for compression
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // Calculate new dimensions (max 800px width/height)
+          let width = img.width;
+          let height = img.height;
+          const maxSize = 800;
+          
+          if (width > height && width > maxSize) {
+            height = (height * maxSize) / width;
+            width = maxSize;
+          } else if (height > maxSize) {
+            width = (width * maxSize) / height;
+            height = maxSize;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          // Draw and compress
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Try different quality levels until size is acceptable
+          let quality = 0.7;
+          let dataUrl = canvas.toDataURL('image/jpeg', quality);
+          
+          // Firestore limit is ~1MB, leave some room for other fields
+          const maxBytes = 900000; // ~900KB
+          while (dataUrl.length > maxBytes && quality > 0.1) {
+            quality -= 0.1;
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
+          
+          if (dataUrl.length > maxBytes) {
+            reject(new Error('Image too large even after compression'));
+          } else {
+            resolve(dataUrl);
+          }
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target.result;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Render single photo
+  function renderPhoto(photo, docId) {
+    const photoItem = document.createElement('div');
+    photoItem.classList.add('photo-item');
+    photoItem.dataset.docId = docId;
+
+    const captionHtml = photo.caption ? `<p class="photo-caption">${escapeHtml(photo.caption)}</p>` : '';
+
+    photoItem.innerHTML = `
+      <img src="${photo.imageData}" alt="${escapeHtml(photo.caption || 'Shared photo')}" class="gallery-photo" />
+      ${captionHtml}
+    `;
+
+    // Right-click to delete
+    photoItem.addEventListener('contextmenu', async (e) => {
+      e.preventDefault();
+      if (confirm('Delete this photo?')) {
+        await deleteDoc(doc(db, 'sharedPhotos', docId));
+        photoItem.remove();
+      }
+    });
+
+    photoGallery.appendChild(photoItem);
+  }
+
+  // Load all photos from Firebase
+  async function loadPhotos() {
+    try {
+      photoGallery.innerHTML = '';
+      
+      const snap = await getDocs(photosCol);
+      snap.forEach(docSnap => {
+        renderPhoto(docSnap.data(), docSnap.id);
+      });
+    } catch (error) {
+      console.error('Error loading photos:', error);
+      photoGallery.innerHTML = '<p style="color: #999; font-style: italic; text-align: center; padding: 2rem;">Failed to load photos. Please refresh the page.</p>';
+    }
+  }
+
+  // Initial load
+  loadPhotos();
+})();
