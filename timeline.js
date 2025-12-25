@@ -1142,6 +1142,13 @@ document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
       ${captionHtml}
     `;
 
+    // Click to view full photo
+    const img = photoItem.querySelector('.gallery-photo');
+    img.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showPhotoModal(photo.imageData, photo.caption);
+    });
+
     // Right-click to delete
     photoItem.addEventListener('contextmenu', async (e) => {
       e.preventDefault();
@@ -1152,6 +1159,43 @@ document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
     });
 
     photoGallery.appendChild(photoItem);
+  }
+
+  // Show full-size photo modal
+  function showPhotoModal(imageSrc, caption) {
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 2rem;';
+    
+    const img = document.createElement('img');
+    img.src = imageSrc;
+    img.style.cssText = 'max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain;';
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.style.cssText = 'position: absolute; top: 1rem; right: 1rem; background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 50%; width: 3rem; height: 3rem; font-size: 1.5rem; cursor: pointer; transition: background 0.2s;';
+    closeBtn.addEventListener('mouseenter', () => closeBtn.style.background = 'rgba(0,0,0,0.7)');
+    closeBtn.addEventListener('mouseleave', () => closeBtn.style.background = 'rgba(0,0,0,0.5)');
+    
+    modal.appendChild(img);
+    modal.appendChild(closeBtn);
+    
+    // Close on click outside or close button
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal || e.target === closeBtn || e.target === img) {
+        modal.remove();
+      }
+    });
+    
+    // Close on ESC key
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        modal.remove();
+        document.removeEventListener('keydown', handleEsc);
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+    
+    document.body.appendChild(modal);
   }
 
   // Load all photos from Firebase
