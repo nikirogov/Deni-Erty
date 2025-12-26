@@ -8,6 +8,8 @@ import {
   deleteDoc,
   updateDoc,
   doc,
+  getDoc,
+  setDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -20,6 +22,14 @@ function escapeHtml(str = '') {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function colorizeNames(text) {
+  if (!text) return '';
+  // Replace "deni" with purple color and "erty" with blue color (case-insensitive)
+  return text
+    .replace(/\bdeni\b/gi, '<span style="color: #ba9aed; font-weight: 600;">deni</span>')
+    .replace(/\berty\b/gi, '<span style="color: #6db3f2; font-weight: 600;">erty</span>');
 }
 
 function formatDate(dateValue) {
@@ -166,6 +176,7 @@ async function addTimelineItem(event, docId = null) {
   li.setAttribute('data-date', formatDate(date));
   if (docId) li.dataset.docId = docId;
   if (specialEvent) li.classList.add('special-event');
+  if (eventType === 'online') li.dataset.online = 'true';
 
   li.innerHTML = `
     <span class="title">${escapeHtml(title)}</span>
@@ -252,7 +263,7 @@ closeModalBtn.addEventListener('click', closeModal);
 
 // EDIT TIMELINE ITEM FUNCTION
 // This function opens the form modal with existing event data for editing
-function editTimelineItem(li) {
+  function editTimelineItem(li) {
   const dataEl = li.querySelector('.data');
   const titleSpan = li.querySelector('.title');
   const h3 = dataEl.querySelector('h3');
@@ -264,9 +275,7 @@ function editTimelineItem(li) {
   const currentDescDeni = deniP ? deniP.textContent.trim() : '';
   const currentDescErty = ertyP ? ertyP.textContent.trim() : '';
   const currentEventType = li.dataset.eventType || 'other';
-  const currentSpecialEvent = li.classList.contains('special-event');
-
-  // Get form inputs
+  const currentSpecialEvent = li.classList.contains('special-event');  // Get form inputs
   const titleInput = addForm.querySelector('[name="title"]');
   const dateInput = addForm.querySelector('[name="date"]');
   const descDeniInput = addForm.querySelector('[name="descriptionDeni"]');
@@ -357,6 +366,11 @@ addForm.addEventListener('submit', async e => {
     editingLi.setAttribute('data-date', formatDate(event.date));
     editingLi.dataset.iso = event.date;
     editingLi.dataset.eventType = event.eventType;
+    if (event.eventType === 'online') {
+      editingLi.dataset.online = 'true';
+    } else {
+      delete editingLi.dataset.online;
+    }
 
     // Update class based on event type
     dataEl.className = event.eventType === 'skip' ? 'data skip-class' : 'data';
@@ -591,8 +605,8 @@ document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
   function calculateStatistics() {
     const timelineItems = document.querySelectorAll('.timeline li[data-iso]');
     
-    // Total dates
-    const totalDates = timelineItems.length;
+    // Total dates (excluding online dates)
+    const totalDates = Array.from(timelineItems).filter(item => !item.dataset.online).length;
     
     // Location breakdown - categorize by type
     let atHomeCount = 0;  // U Deni + U Erty
@@ -612,10 +626,16 @@ document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
       const eventType = item.dataset.eventType;
       const dateStr = item.dataset.iso;
       const title = item.querySelector('.title')?.textContent.toLowerCase() || '';
+      const isOnline = item.dataset.online === 'true';
       
       // Debug first 5 items
       if (index < 5) {
         console.log(`Item ${index + 1}:`, { title, eventType });
+      }
+      
+      // Skip online dates from statistics
+      if (isOnline) {
+        return;
       }
       
       // Count locations - prioritize eventType, then check title as fallback
@@ -1060,7 +1080,9 @@ document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
       const imageData = await compressImage(file);
 
       const photo = {
-        caption: fd.get('caption').trim() || null,
+        title: fd.get('title')?.trim() || 'peika',
+        date: fd.get('date') || new Date().toISOString().split('T')[0],
+        caption: fd.get('caption')?.trim() || null,
         imageData: imageData,
         uploadedAt: serverTimestamp()
       };
@@ -1135,63 +1157,233 @@ document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
     photoItem.classList.add('photo-item');
     photoItem.dataset.docId = docId;
 
-    const captionHtml = photo.caption ? `<p class="photo-caption">${escapeHtml(photo.caption)}</p>` : '';
-
     photoItem.innerHTML = `
       <img src="${photo.imageData}" alt="${escapeHtml(photo.caption || 'Shared photo')}" class="gallery-photo" />
-      ${captionHtml}
     `;
 
     // Click to view full photo
-    const img = photoItem.querySelector('.gallery-photo');
-    img.addEventListener('click', (e) => {
+    photoItem.addEventListener('click', (e) => {
       e.stopPropagation();
-      showPhotoModal(photo.imageData, photo.caption);
+      showPhotoModal(photo, docId);
     });
 
-    // Right-click to delete
+    // Right-click context menu
     photoItem.addEventListener('contextmenu', async (e) => {
       e.preventDefault();
-      if (confirm('Delete this photo?')) {
-        await deleteDoc(doc(db, 'sharedPhotos', docId));
-        photoItem.remove();
-      }
+      
+      // Create context menu
+      const contextMenu = document.createElement('div');
+      contextMenu.style.cssText = 'position:fixed;background:#fff;border:1px solid #ccc;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.15);z-index:10000;padding:0.3rem 0;';
+      contextMenu.style.left = e.clientX + 'px';
+      contextMenu.style.top = e.clientY + 'px';
+      
+      // Edit button
+      const editBtn = document.createElement('button');
+      editBtn.textContent = 'Edit';
+      editBtn.style.cssText = 'display:block;width:100%;padding:0.4rem 1rem;background:none;border:none;text-align:left;cursor:pointer;';
+      editBtn.addEventListener('mouseenter', () => editBtn.style.background = '#f0f0f0');
+      editBtn.addEventListener('mouseleave', () => editBtn.style.background = 'none');
+      editBtn.addEventListener('click', () => {
+        openEditDialog(photo, docId);
+        contextMenu.remove();
+      });
+      
+      // Delete button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.style.cssText = 'display:block;width:100%;padding:0.4rem 1rem;background:none;border:none;text-align:left;cursor:pointer;color:#d32f2f;';
+      deleteBtn.addEventListener('mouseenter', () => deleteBtn.style.background = '#ffebee');
+      deleteBtn.addEventListener('mouseleave', () => deleteBtn.style.background = 'none');
+      deleteBtn.addEventListener('click', async () => {
+        if (confirm('Delete this photo?')) {
+          await deleteDoc(doc(db, 'sharedPhotos', docId));
+          photoItem.remove();
+        }
+        contextMenu.remove();
+      });
+      
+      contextMenu.appendChild(editBtn);
+      contextMenu.appendChild(deleteBtn);
+      document.body.appendChild(contextMenu);
+      
+      // Close menu when clicking outside
+      setTimeout(() => {
+        document.addEventListener('click', () => contextMenu.remove(), { once: true });
+      }, 0);
     });
 
     photoGallery.appendChild(photoItem);
   }
 
-  // Show full-size photo modal
-  function showPhotoModal(imageSrc, caption) {
-    const modal = document.createElement('div');
-    modal.style.cssText = 'position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 2rem;';
+  // Shared function to open edit dialog
+  function openEditDialog(photo, docId, backElement, frontElement) {
+    // Create edit modal
+    const editModal = document.createElement('div');
+    editModal.className = 'modal';
+    editModal.setAttribute('aria-hidden', 'false');
+    editModal.style.display = 'flex';
     
-    const img = document.createElement('img');
-    img.src = imageSrc;
-    img.style.cssText = 'max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain;';
+    const displayTitle = photo.title || 'peika';
+    const displayDate = photo.date || new Date().toISOString().split('T')[0];
+    
+    editModal.innerHTML = `
+      <div class="modal-dialog" role="document">
+        <button class="modal-close" aria-label="Close form">✕</button>
+        <form class="add-event-form" style="width: 100%;">
+          <h3 style="color: #222; margin-bottom: 1rem;">Edit Photo</h3>
+          <input type="text" name="title" placeholder="Title" value="${escapeHtml(displayTitle)}" required />
+          <input type="date" name="date" value="${displayDate}" required />
+          <textarea name="caption" placeholder="Description" rows="4">${escapeHtml(photo.caption || '')}</textarea>
+          <div class="form-actions">
+            <button type="submit">Save</button>
+            <button type="button" class="cancel-edit">Cancel</button>
+          </div>
+        </form>
+      </div>
+    `;
+    
+    document.body.appendChild(editModal);
+    
+    // Auto-focus on caption field
+    const captionField = editModal.querySelector('[name="caption"]');
+    setTimeout(() => captionField.focus(), 100);
+    
+    const form = editModal.querySelector('form');
+    const closeEditModal = () => {
+      editModal.remove();
+    };
+    
+    editModal.querySelector('.modal-close').addEventListener('click', closeEditModal);
+    editModal.querySelector('.cancel-edit').addEventListener('click', closeEditModal);
+    
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const newTitle = fd.get('title').trim();
+      const newDate = fd.get('date');
+      const newCaption = fd.get('caption').trim();
+      
+      if (docId) {
+        await updateDoc(doc(db, 'sharedPhotos', docId), { 
+          title: newTitle,
+          date: newDate,
+          caption: newCaption 
+        });
+        
+        // Update display if elements provided
+        if (backElement) {
+          backElement.querySelector('h3').textContent = newTitle;
+          backElement.querySelector('.back-date').textContent = formatDate(newDate);
+          backElement.querySelector('.back-caption').textContent = newCaption;
+          backElement.dataset.date = newDate;
+        }
+        if (frontElement) {
+          frontElement.querySelector('.polaroid-date').textContent = formatDate(newDate);
+        }
+        
+        loadPhotos(); // Refresh gallery
+      }
+      closeEditModal();
+    });
+  }
+
+  // Show full-size photo modal in polaroid style
+  function showPhotoModal(photo, docId) {
+    const { imageData, caption, title, date } = photo;
+    const displayTitle = title || 'peika';
+    const displayDate = date || new Date().toISOString().split('T')[0];
+    
+    const modal = document.createElement('div');
+    modal.className = 'photo-modal-overlay';
+    
+    const polaroid = document.createElement('div');
+    polaroid.className = 'polaroid';
+    
+    const polaroidInner = document.createElement('div');
+    polaroidInner.className = 'polaroid-inner';
+    
+    // Front side (photo)
+    const front = document.createElement('div');
+    front.className = 'polaroid-front';
+    front.innerHTML = `
+      <div class="polaroid-photo">
+        <img src="${imageData}" alt="Photo" />
+      </div>
+      <div class="polaroid-date">${formatDate(displayDate)}</div>
+    `;
+    
+    // Back side (caption)
+    const back = document.createElement('div');
+    back.className = 'polaroid-back';
+    back.dataset.date = displayDate;
+    back.innerHTML = `
+      <div class="polaroid-back-content">
+        <h3>${escapeHtml(displayTitle)}</h3>
+        <p class="back-date">${formatDate(displayDate)}</p>
+        <div class="back-caption">${colorizeNames(escapeHtml(caption || ''))}</div>
+      </div>
+    `;
+    
+    polaroidInner.appendChild(front);
+    polaroidInner.appendChild(back);
+    polaroid.appendChild(polaroidInner);
     
     const closeBtn = document.createElement('button');
-    closeBtn.textContent = '✕';
-    closeBtn.style.cssText = 'position: absolute; top: 1rem; right: 1rem; background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 50%; width: 3rem; height: 3rem; font-size: 1.5rem; cursor: pointer; transition: background 0.2s;';
-    closeBtn.addEventListener('mouseenter', () => closeBtn.style.background = 'rgba(0,0,0,0.7)');
-    closeBtn.addEventListener('mouseleave', () => closeBtn.style.background = 'rgba(0,0,0,0.5)');
+    closeBtn.className = 'photo-modal-close';
+    closeBtn.innerHTML = '✕';
     
-    modal.appendChild(img);
+    modal.appendChild(polaroid);
     modal.appendChild(closeBtn);
     
-    // Close on click outside or close button
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal || e.target === closeBtn || e.target === img) {
-        modal.remove();
-      }
+    // Flip polaroid on click (but not on buttons)
+    polaroid.addEventListener('click', (e) => {
+      e.stopPropagation();
+      polaroidInner.classList.toggle('flipped');
     });
     
-    // Close on ESC key
+    // Right-click context menu on polaroid
+    polaroid.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      
+      // Create context menu
+      const contextMenu = document.createElement('div');
+      contextMenu.style.cssText = 'position:fixed;background:#fff;border:1px solid #ccc;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,0.15);z-index:10001;padding:0.3rem 0;';
+      contextMenu.style.left = e.clientX + 'px';
+      contextMenu.style.top = e.clientY + 'px';
+      
+      // Edit button
+      const ctxEditBtn = document.createElement('button');
+      ctxEditBtn.textContent = 'Edit';
+      ctxEditBtn.style.cssText = 'display:block;width:100%;padding:0.4rem 1rem;background:none;border:none;text-align:left;cursor:pointer;';
+      ctxEditBtn.addEventListener('mouseenter', () => ctxEditBtn.style.background = '#f0f0f0');
+      ctxEditBtn.addEventListener('mouseleave', () => ctxEditBtn.style.background = 'none');
+      ctxEditBtn.addEventListener('click', async () => {
+        openEditDialog(photo, docId, back, front);
+        contextMenu.remove();
+      });
+      
+      contextMenu.appendChild(ctxEditBtn);
+      document.body.appendChild(contextMenu);
+      
+      // Close menu when clicking outside
+      setTimeout(() => {
+        document.addEventListener('click', () => contextMenu.remove(), { once: true });
+      }, 0);
+    });
+    
+    // Close modal
+    const closeModal = () => {
+      modal.remove();
+      document.removeEventListener('keydown', handleEsc);
+    };
+    
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+    
     const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        modal.remove();
-        document.removeEventListener('keydown', handleEsc);
-      }
+      if (e.key === 'Escape') closeModal();
     };
     document.addEventListener('keydown', handleEsc);
     
@@ -1204,8 +1396,21 @@ document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
       photoGallery.innerHTML = '';
       
       const snap = await getDocs(photosCol);
+      
+      // Convert to array and sort by date (most recent first)
+      const photos = [];
       snap.forEach(docSnap => {
-        renderPhoto(docSnap.data(), docSnap.id);
+        photos.push({ data: docSnap.data(), id: docSnap.id });
+      });
+      
+      photos.sort((a, b) => {
+        const dateA = a.data.date || '';
+        const dateB = b.data.date || '';
+        return dateB.localeCompare(dateA); // Descending order (newest first)
+      });
+      
+      photos.forEach(photo => {
+        renderPhoto(photo.data, photo.id);
       });
     } catch (error) {
       console.error('Error loading photos:', error);
@@ -1215,4 +1420,513 @@ document.querySelectorAll('.timeline li .data').forEach(wireDataHandlers);
 
   // Initial load
   loadPhotos();
+})();
+
+/******************** DATE RANKINGS ********************/
+(function() {
+  const editDeniBtn = document.getElementById('editDeniRanking');
+  const editErtyBtn = document.getElementById('editErtyRanking');
+  const deniRankingList = document.getElementById('deniRankingList');
+  const ertyRankingList = document.getElementById('ertyRankingList');
+  
+  const rankingModal = document.getElementById('editRankingModal');
+  const closeRankingModalBtn = document.getElementById('closeRankingModal');
+  const cancelRankingBtn = document.getElementById('cancelRanking');
+  const saveRankingBtn = document.getElementById('saveRanking');
+  const rankingModalTitle = document.getElementById('rankingModalTitle');
+  const rankingEditor = document.getElementById('rankingEditor');
+  
+  const noteModal = document.getElementById('addRankingNoteModal');
+  const closeNoteModalBtn = document.getElementById('closeNoteModal');
+  const cancelNoteBtn = document.getElementById('cancelNote');
+  const noteModalTitle = document.getElementById('noteModalTitle');
+  const rankingNoteForm = document.getElementById('rankingNoteForm');
+  
+  const rankingsCol = collection(db, 'dateRankings');
+  
+  let currentEditor = null; // 'deni' or 'erty'
+  let currentRankings = [];
+  let currentNoteItem = null;
+
+  // Modal controls
+  function openRankingModal(person) {
+    currentEditor = person;
+    rankingModalTitle.textContent = person === 'deni' ? "Edit Deni's Rankings" : "Edit Erty's Rankings";
+    loadRankingEditor();
+    rankingModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  
+  function closeRankingModal() {
+    rankingModal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    currentEditor = null;
+    currentRankings = [];
+  }
+
+  function openNoteModal(item) {
+    currentNoteItem = item;
+    const event = getEventById(item.eventId);
+    noteModalTitle.textContent = event ? event.title : 'Add Note';
+    rankingNoteForm.querySelector('[name="note"]').value = item.note || '';
+    noteModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  
+  function closeNoteModal() {
+    noteModal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    currentNoteItem = null;
+    rankingNoteForm.reset();
+  }
+
+  // Event listeners
+  editDeniBtn.addEventListener('click', () => openRankingModal('deni'));
+  editErtyBtn.addEventListener('click', () => openRankingModal('erty'));
+  closeRankingModalBtn.addEventListener('click', closeRankingModal);
+  cancelRankingBtn.addEventListener('click', closeRankingModal);
+  closeNoteModalBtn.addEventListener('click', closeNoteModal);
+  cancelNoteBtn.addEventListener('click', closeNoteModal);
+
+  // Get all timeline events (excluding online dates)
+  function getAllDates() {
+    const timelineItems = document.querySelectorAll('.timeline li[data-iso]');
+    const dates = [];
+    
+    timelineItems.forEach(item => {
+      const isOnline = item.dataset.online === 'true';
+      if (!isOnline) {
+        const title = item.querySelector('.title')?.textContent.trim();
+        const dateStr = item.dataset.iso;
+        const docId = item.dataset.docId;
+        
+        if (title && dateStr && docId) {
+          dates.push({
+            eventId: docId,
+            title: title,
+            date: dateStr,
+            formattedDate: formatDate(dateStr)
+          });
+        }
+      }
+    });
+    
+    return dates.sort((a, b) => new Date(b.date) - new Date(a.date));
+  }
+
+  function getEventById(eventId) {
+    const dates = getAllDates();
+    return dates.find(d => d.eventId === eventId);
+  }
+
+  // Load ranking editor with all dates
+  async function loadRankingEditor() {
+    const allDates = getAllDates();
+    const existingRankings = await loadRankingsFromFirebase(currentEditor);
+    
+    currentRankings = existingRankings.map(r => ({
+      eventId: r.eventId,
+      note: r.note || ''
+    }));
+    
+    rankingEditor.innerHTML = '';
+    
+    // Create ranked section
+    const rankedSection = document.createElement('div');
+    rankedSection.className = 'ranking-section';
+    rankedSection.innerHTML = '<h4 style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem; padding-left: 0.5rem;">📌 Your Top Rankings (Drag to reorder)</h4>';
+    const rankedContainer = document.createElement('div');
+    rankedContainer.className = 'ranked-container';
+    rankedContainer.id = 'rankedContainer';
+    
+    // Add ranked dates
+    currentRankings.forEach((ranking, index) => {
+      const event = getEventById(ranking.eventId);
+      if (event) {
+        const item = createRankingEditorItem(event, index + 1, ranking.note, true);
+        rankedContainer.appendChild(item);
+      }
+    });
+    
+    rankedSection.appendChild(rankedContainer);
+    rankingEditor.appendChild(rankedSection);
+    
+    // Create unranked section
+    const unrankedSection = document.createElement('div');
+    unrankedSection.className = 'ranking-section';
+    unrankedSection.style.marginTop = '1.5rem';
+    unrankedSection.innerHTML = '<h4 style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem; padding-left: 0.5rem;">📋 All Dates (Drag to ranking above)</h4>';
+    const unrankedContainer = document.createElement('div');
+    unrankedContainer.className = 'unranked-container';
+    unrankedContainer.id = 'unrankedContainer';
+    
+    // Add unranked dates
+    allDates.forEach(date => {
+      const isRanked = currentRankings.some(r => r.eventId === date.eventId);
+      if (!isRanked) {
+        const item = createRankingEditorItem(date, null, '', false);
+        unrankedContainer.appendChild(item);
+      }
+    });
+    
+    unrankedSection.appendChild(unrankedContainer);
+    rankingEditor.appendChild(unrankedSection);
+    
+    setupDragAndDrop();
+  }
+
+  function createRankingEditorItem(event, rank, note, isRanked) {
+    const item = document.createElement('div');
+    item.classList.add('ranking-editor-item');
+    item.draggable = true;
+    item.dataset.eventId = event.eventId;
+    if (isRanked) item.classList.add('ranked');
+    
+    item.innerHTML = `
+      <span class="drag-handle">☰</span>
+      <div class="ranking-item-content">
+        <div class="ranking-item-title">${escapeHtml(event.title)}</div>
+        <div class="ranking-item-date">${event.formattedDate}</div>
+        ${note ? `<div class="ranking-item-note" style="font-size: 0.85rem; color: #666; margin-top: 0.3rem; font-style: italic;">${escapeHtml(note)}</div>` : ''}
+      </div>
+      <div class="ranking-item-actions">
+        ${rank ? `<span class="ranking-item-number">${rank}</span>` : ''}
+        <button class="add-note-btn" data-event-id="${event.eventId}">📝 Note</button>
+      </div>
+    `;
+    
+    // Add note button
+    const noteBtn = item.querySelector('.add-note-btn');
+    noteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const eventId = noteBtn.dataset.eventId;
+      let rankingItem = currentRankings.find(r => r.eventId === eventId);
+      if (!rankingItem) {
+        rankingItem = { eventId: eventId, note: '' };
+        currentRankings.push(rankingItem);
+      }
+      openNoteModal(rankingItem);
+    });
+    
+    return item;
+  }
+
+  // Drag and drop functionality
+  function setupDragAndDrop() {
+    const items = rankingEditor.querySelectorAll('.ranking-editor-item');
+    const rankedContainer = document.getElementById('rankedContainer');
+    const unrankedContainer = document.getElementById('unrankedContainer');
+    let draggedItem = null;
+    
+    items.forEach(item => {
+      item.addEventListener('dragstart', function(e) {
+        draggedItem = this;
+        this.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      
+      item.addEventListener('dragend', function(e) {
+        this.classList.remove('dragging');
+        updateRankingsFromEditor();
+        updateRankingNumbers(); // Just update numbers, don't reload everything
+      });
+      
+      item.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        if (draggedItem !== this) {
+          const rect = this.getBoundingClientRect();
+          const midpoint = rect.top + rect.height / 2;
+          
+          if (e.clientY < midpoint) {
+            this.parentNode.insertBefore(draggedItem, this);
+          } else {
+            this.parentNode.insertBefore(draggedItem, this.nextSibling);
+          }
+        }
+      });
+    });
+    
+    // Allow dropping on containers
+    [rankedContainer, unrankedContainer].forEach(container => {
+      container.addEventListener('dragover', function(e) {
+        e.preventDefault();
+      });
+      
+      container.addEventListener('drop', function(e) {
+        e.preventDefault();
+        if (draggedItem && this.children.length === 0) {
+          this.appendChild(draggedItem);
+        }
+      });
+    });
+  }
+
+  function updateRankingNumbers() {
+    const rankedContainer = document.getElementById('rankedContainer');
+    if (!rankedContainer) return;
+    
+    const items = rankedContainer.querySelectorAll('.ranking-editor-item');
+    items.forEach((item, index) => {
+      // Update or add ranking number
+      let numberSpan = item.querySelector('.ranking-item-number');
+      const actionsDiv = item.querySelector('.ranking-item-actions');
+      
+      if (!numberSpan) {
+        numberSpan = document.createElement('span');
+        numberSpan.className = 'ranking-item-number';
+        actionsDiv.insertBefore(numberSpan, actionsDiv.firstChild);
+      }
+      
+      numberSpan.textContent = index + 1;
+      item.classList.add('ranked');
+    });
+    
+    // Remove numbers from unranked items
+    const unrankedContainer = document.getElementById('unrankedContainer');
+    if (unrankedContainer) {
+      const unrankedItems = unrankedContainer.querySelectorAll('.ranking-editor-item');
+      unrankedItems.forEach(item => {
+        const numberSpan = item.querySelector('.ranking-item-number');
+        if (numberSpan) numberSpan.remove();
+        item.classList.remove('ranked');
+      });
+    }
+  }
+
+  function updateRankingsFromEditor() {
+    const rankedContainer = document.getElementById('rankedContainer');
+    if (!rankedContainer) return;
+    
+    const items = Array.from(rankedContainer.querySelectorAll('.ranking-editor-item'));
+    const newRankings = [];
+    
+    items.forEach((item, index) => {
+      const eventId = item.dataset.eventId;
+      const existingRanking = currentRankings.find(r => r.eventId === eventId);
+      
+      newRankings.push({
+        eventId: eventId,
+        note: existingRanking ? existingRanking.note : ''
+      });
+    });
+    
+    currentRankings = newRankings;
+  }
+
+  // Save note
+  rankingNoteForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const note = rankingNoteForm.querySelector('[name="note"]').value.trim();
+    
+    if (currentNoteItem) {
+      currentNoteItem.note = note;
+      loadRankingEditor(); // Refresh to show note
+    }
+    
+    closeNoteModal();
+  });
+
+  // Save rankings
+  saveRankingBtn.addEventListener('click', async () => {
+    updateRankingsFromEditor();
+    
+    // Only save the first 10 (or all if less than 10)
+    const topRankings = currentRankings.slice(0, 10);
+    
+    await saveRankingsToFirebase(currentEditor, topRankings);
+    closeRankingModal();
+    loadRankings();
+  });
+
+  // Load rankings from Firebase
+  async function loadRankingsFromFirebase(person) {
+    const docRef = doc(db, 'dateRankings', person);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return docSnap.data().rankings || [];
+    }
+    return [];
+  }
+
+  // Save rankings to Firebase
+  async function saveRankingsToFirebase(person, rankings) {
+    const docRef = doc(db, 'dateRankings', person);
+    await setDoc(docRef, {
+      rankings: rankings,
+      updatedAt: serverTimestamp()
+    });
+  }
+
+  // Render rankings in the display
+  async function loadRankings() {
+    // Load Deni's rankings
+    const deniRankings = await loadRankingsFromFirebase('deni');
+    renderRankingList(deniRankingList, deniRankings);
+    
+    // Load Erty's rankings
+    const ertyRankings = await loadRankingsFromFirebase('erty');
+    renderRankingList(ertyRankingList, ertyRankings);
+  }
+
+  function renderRankingList(listElement, rankings) {
+    listElement.innerHTML = '';
+    
+    if (rankings.length === 0) {
+      listElement.classList.add('empty');
+      return;
+    }
+    
+    listElement.classList.remove('empty');
+    
+    rankings.forEach(ranking => {
+      const event = getEventById(ranking.eventId);
+      if (event) {
+        const li = document.createElement('li');
+        
+        li.innerHTML = `
+          <div class="ranking-date-title">${escapeHtml(event.title)}</div>
+          <div class="ranking-date-info">${event.formattedDate}</div>
+          ${ranking.note ? `<div class="ranking-date-note">${escapeHtml(ranking.note)}</div>` : ''}
+        `;
+        
+        listElement.appendChild(li);
+      }
+    });
+  }
+
+  // Initial load
+  loadRankings();
+  
+  // Make globally accessible for updates
+  window.updateRankings = loadRankings;
+})();
+
+/******************** PROMISES ********************/
+(function() {
+  const showPromiseBtn = document.getElementById('showAddPromise');
+  const promiseModal = document.getElementById('addPromiseModal');
+  const closePromiseModalBtn = document.getElementById('closePromiseModal');
+  const cancelPromiseBtn = document.getElementById('cancelAddPromise');
+  const addPromiseForm = document.getElementById('addPromiseForm');
+  const promisesList = document.getElementById('promisesList');
+  
+  const promisesCol = collection(db, 'promises');
+
+  // Modal controls
+  function openPromiseModal() {
+    promiseModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  
+  function closePromiseModal() {
+    promiseModal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    addPromiseForm.reset();
+  }
+
+  showPromiseBtn.addEventListener('click', openPromiseModal);
+  closePromiseModalBtn.addEventListener('click', closePromiseModal);
+  cancelPromiseBtn.addEventListener('click', closePromiseModal);
+
+  // Add promise
+  addPromiseForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(addPromiseForm);
+    
+    const promise = {
+      promise: fd.get('promise').trim(),
+      promiseMaker: fd.get('promiseMaker'),
+      promiseDate: fd.get('promiseDate') || null,
+      fulfilled: fd.get('fulfilled') === 'on',
+      createdAt: serverTimestamp()
+    };
+
+    if (!promise.promise || !promise.promiseMaker) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    const docRef = await addDoc(promisesCol, promise);
+    renderPromise(promise, docRef.id);
+    closePromiseModal();
+  });
+
+  // Render single promise
+  function renderPromise(promise, docId) {
+    const promiseItem = document.createElement('div');
+    promiseItem.classList.add('promise-item', promise.promiseMaker);
+    promiseItem.dataset.docId = docId;
+    
+    if (promise.fulfilled) {
+      promiseItem.classList.add('fulfilled');
+    }
+
+    const makerText = promise.promiseMaker === 'both' ? 'Both' : 
+                     promise.promiseMaker === 'deni' ? 'Deni' : 'Erty';
+    
+    const dateText = promise.promiseDate ? 
+      `<div class="promise-date">📅 ${formatDate(promise.promiseDate)}</div>` : '';
+
+    promiseItem.innerHTML = `
+      <div class="promise-header">
+        <span class="promise-maker">${makerText}</span>
+      </div>
+      <div class="promise-text">"${escapeHtml(promise.promise)}"</div>
+      ${dateText}
+      <div class="promise-actions">
+        <button class="toggle-fulfill-btn">${promise.fulfilled ? 'Unfulfill' : 'Mark Fulfilled'}</button>
+        <button class="delete-promise-btn">Delete</button>
+      </div>
+    `;
+
+    // Toggle fulfill button
+    const toggleBtn = promiseItem.querySelector('.toggle-fulfill-btn');
+    toggleBtn.addEventListener('click', async () => {
+      const newFulfilled = !promise.fulfilled;
+      await updateDoc(doc(db, 'promises', docId), {
+        fulfilled: newFulfilled
+      });
+      loadPromises(); // Refresh
+    });
+
+    // Delete button
+    const deleteBtn = promiseItem.querySelector('.delete-promise-btn');
+    deleteBtn.addEventListener('click', async () => {
+      if (confirm('Delete this promise?')) {
+        await deleteDoc(doc(db, 'promises', docId));
+        promiseItem.remove();
+      }
+    });
+
+    promisesList.appendChild(promiseItem);
+  }
+
+  // Load all promises from Firebase
+  async function loadPromises() {
+    promisesList.innerHTML = '';
+    
+    const snap = await getDocs(promisesCol);
+    const promises = [];
+    
+    snap.forEach(docSnap => {
+      promises.push({ ...docSnap.data(), docId: docSnap.id });
+    });
+    
+    // Sort: unfulfilled first, then by date
+    promises.sort((a, b) => {
+      if (a.fulfilled && !b.fulfilled) return 1;
+      if (!a.fulfilled && b.fulfilled) return -1;
+      
+      // If both same fulfilled status, sort by date (newest first)
+      const dateA = a.createdAt?.toDate?.() || new Date(0);
+      const dateB = b.createdAt?.toDate?.() || new Date(0);
+      return dateB - dateA;
+    });
+    
+    promises.forEach(promise => renderPromise(promise, promise.docId));
+  }
+
+  // Initial load
+  loadPromises();
 })();

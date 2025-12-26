@@ -36,6 +36,7 @@
                     <option value="skip">Peika do Lidl</option>
                     <option value="udeni">U Deni</option>
                     <option value="uerty">U Erty</option>
+                    <option value="online">Online</option>
                     <option value="other">Other</option>
                 </select>
                 <label><input type="checkbox" name="specialEvent" /> Special Event</label>
@@ -138,19 +139,113 @@
 
     <ul id="dateIdeasList" class="date-ideas-list"></ul>
 
+    <!-- Date Rankings Section -->
+    <h3 class="hints">Date Rankings</h3>
+    
+    <div class="rankings-container">
+        <!-- Deni's Rankings -->
+        <div class="ranking-column deni-ranking">
+            <div class="ranking-header">
+                <h4>💜 Deni's Favorites</h4>
+                <button id="editDeniRanking" class="edit-ranking-btn">Edit</button>
+            </div>
+            <ol id="deniRankingList" class="ranking-list">
+                <!-- Deni's ranked dates will appear here -->
+            </ol>
+        </div>
+
+        <!-- Erty's Rankings -->
+        <div class="ranking-column erty-ranking">
+            <div class="ranking-header">
+                <h4>💙 Erty's Favorites</h4>
+                <button id="editErtyRanking" class="edit-ranking-btn">Edit</button>
+            </div>
+            <ol id="ertyRankingList" class="ranking-list">
+                <!-- Erty's ranked dates will appear here -->
+            </ol>
+        </div>
+    </div>
+
+    <!-- Modal for editing rankings -->
+    <div id="editRankingModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="modal-dialog ranking-modal-dialog" role="document">
+            <button id="closeRankingModal" class="modal-close" aria-label="Close form">✕</button>
+            <h3 id="rankingModalTitle" style="text-align: center; color: #222; margin-bottom: 1rem;"></h3>
+            <div class="ranking-instructions" style="color: #fffdfd; text-align: center; margin-bottom: 1rem; font-size: 0.9rem;">
+                Drag dates to reorder them. Click a date to add/edit a note.
+            </div>
+            <div id="rankingEditor" class="ranking-editor">
+                <!-- Available dates for ranking will appear here -->
+            </div>
+            <div class="form-actions">
+                <button id="saveRanking" class="purple-btn">Save Rankings</button>
+                <button type="button" id="cancelRanking">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for adding note to ranked date -->
+    <div id="addRankingNoteModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="modal-dialog" role="document">
+            <button id="closeNoteModal" class="modal-close" aria-label="Close form">✕</button>
+            <h3 id="noteModalTitle" style="text-align: center; color: #222; margin-bottom: 1rem;"></h3>
+            <form id="rankingNoteForm" class="add-event-form">
+                <textarea name="note" placeholder="Add a note about why you love this date..." rows="4"></textarea>
+                <div class="form-actions">
+                    <button type="submit">Save Note</button>
+                    <button type="button" id="cancelNote">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Shared Photos Section -->
-    <h3 class="hints">Our Photos</h3>
+   
+    <!-- Modal add-promise form -->
+     <h3 class="hints">Our Promises</h3>
+    
+    <div class="controls">
+        <button id="showAddPromise" type="button" class="purple-btn">Add Promise</button>
+    </div>
+    <div id="addPromiseModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+        <div class="modal-dialog" role="document">
+            <button id="closePromiseModal" class="modal-close" aria-label="Close form">✕</button>
+            <form id="addPromiseForm" class="add-event-form" aria-label="Add promise">
+                <input name="promise" type="text" placeholder="Promise text" required />
+                <select name="promiseMaker" required>
+                    <option value="">Who made this promise?</option>
+                    <option value="deni">Deni</option>
+                    <option value="erty">Erty</option>
+                    <option value="both">Both</option>
+                </select>
+                <input name="promiseDate" type="date" placeholder="Date (optional)" />
+                <label><input type="checkbox" name="fulfilled" /> Fulfilled</label>
+                <div class="form-actions">
+                    <button type="submit">Add Promise</button>
+                    <button type="button" id="cancelAddPromise">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="promisesList" class="promises-list">
+        <!-- Promises will be dynamically inserted here -->
+    </div>
+     <h3 class="hints">Our Photos</h3>
     
     <div class="controls">
         <button id="showAddPhoto" type="button" class="purple-btn">Upload Photo</button>
     </div>
+
 
     <!-- Modal add-photo form -->
     <div id="addPhotoModal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
         <div class="modal-dialog" role="document">
             <button id="closePhotoModal" class="modal-close" aria-label="Close form">✕</button>
             <form id="addPhotoForm" class="add-event-form" aria-label="Add photo">
-                <input name="caption" type="text" placeholder="Caption (optional)" />
+                <input name="title" type="text" placeholder="Title (e.g., peika)" required />
+                <input name="date" type="date" required />
+                <textarea name="caption" placeholder="Description (optional)" rows="3"></textarea>
                 <div class="file-input-wrapper">
                     <label for="photoFileInput" style="display: block; margin-bottom: 0.5rem; color: #222; font-weight: 500;">Select Photo:</label>
                     <input type="file" id="photoFileInput" name="photoFile" accept="image/*" required />
@@ -164,6 +259,9 @@
     </div>
 
     <div id="photoGallery" class="photo-gallery"></div>
+
+    <!-- Promises Section -->
+    
 </div>
 
 <script type="module" src="timeline.js"></script>
